@@ -1,0 +1,3814 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>复盘台 · 直播运营作战系统</title>
+<style>
+  :root{
+    --bg:#F5F5F3; --surface:#FFFFFF; --surface-2:#F0F0EC; --surface-3:#E8E8E3;
+    --border:#E2E2DC; --border-strong:#CFCFC7;
+    --text:#191917; --text-2:#565651; --text-3:#8C8B85;
+    --red:#C0392B; --red-bg:#FCEDEB; --red-line:#E8B4AC;
+    --amber:#A8701A; --amber-bg:#FCF3E2; --amber-line:#E8D5A8;
+    --green:#276B4E; --green-bg:#E8F3ED; --green-line:#B8D6C6;
+    --blue:#21578E; --blue-bg:#E9F0F9; --blue-line:#B4CBE4;
+    --purple:#5F4595; --purple-bg:#EFEBF9; --purple-line:#CBBFE8;
+    --radius:10px; --radius-sm:7px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);font-size:13px;line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{display:flex;height:100vh;overflow:hidden}
+
+  /* ===== 侧栏 ===== */
+  .side{width:190px;flex-shrink:0;background:#1C1C1A;color:#E8E8E3;
+    display:flex;flex-direction:column;overflow-y:auto}
+  .brand{padding:16px 16px 14px;border-bottom:1px solid #2E2E2B}
+  .brand h1{font-size:14px;font-weight:600;letter-spacing:-.1px;color:#fff}
+  .brand p{font-size:10.5px;color:#8C8B85;margin-top:2px}
+  .nav{padding:10px 8px;flex:1}
+  .nav-sec{font-size:10px;color:#6B6B66;padding:10px 8px 5px;letter-spacing:.5px}
+  .nav-i{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:6px;
+    font-size:12.5px;color:#B8B8B3;cursor:pointer;transition:all .1s;user-select:none;margin-bottom:1px}
+  .nav-i:hover{background:#2A2A27;color:#fff}
+  .nav-i.on{background:#333330;color:#fff;font-weight:500}
+  .nav-i .ii{width:14px;text-align:center;font-size:11px;opacity:.8;flex-shrink:0}
+  .nav-i .cnt{margin-left:auto;font-size:10px;background:#C0392B;color:#fff;
+    padding:0 5px;border-radius:8px;line-height:15px;min-width:16px;text-align:center}
+  .nav-i.dis{opacity:.34;cursor:not-allowed}
+  .nav-i.dis:hover{background:transparent;color:#B8B8B3}
+  .side-foot{padding:10px 14px;border-top:1px solid #2E2E2B;font-size:10px;color:#6B6B66;line-height:1.6}
+
+  /* ===== 主区 ===== */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+
+  .topbar{height:52px;flex-shrink:0;background:var(--surface);
+    border-bottom:1px solid var(--border);display:flex;align-items:center;
+    gap:14px;padding:0 20px;flex-wrap:nowrap;overflow-x:auto}
+  .tb-title{font-size:14px;font-weight:600;white-space:nowrap}
+  .tb-sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+  .tb-meta{font-size:11.5px;color:var(--text-3);white-space:nowrap}
+  .tb-right{margin-left:auto;display:flex;gap:7px;flex-shrink:0}
+
+  /* ===== 返回键 ===== */
+  .tb-back{flex-shrink:0;display:flex;align-items:center}
+  .tb-back:empty{display:none}
+  .btn.back{border-color:var(--border-strong);font-weight:600;padding:5px 10px}
+  .btn.back:hover{background:var(--surface-2)}
+  .btn.back .bk-lb{display:inline-block;max-width:158px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;
+    font-weight:400;opacity:.8;margin-left:5px}
+  /* 窄屏（侧栏被隐藏）才出现的页面切换菜单 */
+  .only-narrow{display:none !important}
+  @media(max-width:960px){ .only-narrow{display:inline-flex !important} }
+  .vmenu{position:fixed;top:58px;right:12px;z-index:90;background:var(--surface);
+    border:1px solid var(--border-strong);border-radius:9px;padding:5px;
+    box-shadow:0 12px 32px rgba(0,0,0,.18);min-width:172px;
+    max-width:calc(100vw - 24px);max-height:70vh;overflow-y:auto}
+  .vmenu .vm-sec{font-size:10px;color:var(--text-3);padding:7px 10px 3px;letter-spacing:.5px}
+  .vmenu .vm-i{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:6px;
+    font-size:12.5px;cursor:pointer;white-space:nowrap}
+  .vmenu .vm-i:hover{background:var(--surface-2)}
+  .vmenu .vm-i.on{background:var(--blue-bg);color:var(--blue);font-weight:600}
+  .vmenu .vm-i .ii{width:14px;text-align:center;font-size:11px;opacity:.75;flex-shrink:0}
+
+  .btn{padding:6px 12px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;
+    border:1px solid var(--border-strong);background:var(--surface);color:var(--text);
+    transition:all .1s;white-space:nowrap;font-family:inherit}
+  .btn:hover{background:var(--surface-2)}
+  .btn.pri{background:#1C1C1A;color:#fff;border-color:#1C1C1A}
+  .btn.pri:hover{opacity:.85}
+  .btn.sm{padding:4px 9px;font-size:11.5px}
+
+  .scroll{flex:1;overflow-y:auto;padding:14px 20px 60px}
+
+  /* ===== 子页签（维度切换条）===== */
+  .tabs{flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);
+    display:flex;align-items:stretch;gap:1px;padding:0 16px;overflow-x:auto;
+    scrollbar-width:none}
+  .tabs::-webkit-scrollbar{height:0;display:none}
+  .tab{flex-shrink:0;padding:0 12px;height:37px;display:inline-flex;align-items:center;gap:6px;
+    font-size:12px;color:var(--text-3);cursor:pointer;white-space:nowrap;
+    border-bottom:2px solid transparent;transition:color .12s,background .12s;
+    user-select:none;font-family:inherit}
+  .tab:hover{color:var(--text);background:var(--surface-2)}
+  .tab.on{color:var(--text);font-weight:600;border-bottom-color:var(--text);background:transparent}
+  .tab .tb-n{font-size:10px;background:var(--surface-3);color:var(--text-2);
+    padding:0 5px;border-radius:8px;line-height:15px;min-width:16px;text-align:center;
+    font-weight:500;font-variant-numeric:tabular-nums}
+  .tab.on .tb-n{background:var(--text);color:#fff}
+  .tab .tb-n.hot{background:var(--red);color:#fff}
+
+  /* ===== 维度卡片（总览页的跳转入口）===== */
+  .dims{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .dim{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:13px 14px;cursor:pointer;transition:border-color .12s,transform .12s;
+    position:relative;overflow:hidden;min-width:0}
+  .dim:hover{border-color:var(--border-strong);transform:translateY(-1px)}
+  .dim-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .dim-t{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+  .dim-t .ii{font-size:11px;color:var(--text-3)}
+  .dim-go{font-size:11px;color:var(--text-3);opacity:0;transition:opacity .12s}
+  .dim:hover .dim-go{opacity:1}
+  .dim-line{font-size:11.5px;color:var(--text-2);line-height:1.6;
+    display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    padding:3px 0;border-bottom:1px dashed var(--border)}
+  .dim-line:last-child{border-bottom:0}
+  .dim-line b{font-variant-numeric:tabular-nums;font-weight:600;flex-shrink:0}
+  .dim-line .lb{color:var(--text-3)}
+  .dim.sum{background:var(--surface-2)}
+  .dim.sum:hover{transform:none;cursor:default}
+
+  /* ===== 网格系统 ===== */
+  .grid{display:grid;gap:12px;margin-bottom:12px}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g21{grid-template-columns:2fr 1fr}
+  .g12{grid-template-columns:1fr 2fr}
+  .g31{grid-template-columns:3fr 1fr}
+
+  .card{background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:14px;min-width:0}
+  .card.pad0{padding:0;overflow:hidden}
+  .ch{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
+  .ct{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px}
+  .ct .tagline{font-size:10px;font-weight:500;padding:1px 6px;border-radius:4px;
+    background:var(--surface-2);color:var(--text-3)}
+  .cs{font-size:11px;color:var(--text-3);white-space:nowrap}
+
+  /* ===== KPI 卡 ===== */
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:12px 13px;position:relative;overflow:hidden}
+  .kpi-l{font-size:11px;color:var(--text-3);margin-bottom:5px;display:flex;align-items:center;gap:5px}
+  .kpi-v{font-size:24px;font-weight:600;letter-spacing:-.7px;line-height:1.1;
+    font-variant-numeric:tabular-nums}
+  .kpi-v small{font-size:12px;font-weight:400;color:var(--text-3);letter-spacing:0;margin-left:2px}
+  .kpi-d{font-size:11px;margin-top:5px;display:flex;align-items:center;gap:5px}
+  .kpi-bar{height:3px;border-radius:2px;background:var(--surface-3);margin-top:8px;overflow:hidden}
+  .kpi-bar i{display:block;height:100%;border-radius:2px}
+  .up{color:var(--red)} .down{color:var(--green)} .flat{color:var(--text-3)}
+  .badge{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:500}
+  .b-red{background:var(--red-bg);color:var(--red)}
+  .b-amber{background:var(--amber-bg);color:var(--amber)}
+  .b-green{background:var(--green-bg);color:var(--green)}
+  .b-blue{background:var(--blue-bg);color:var(--blue)}
+  .b-purple{background:var(--purple-bg);color:var(--purple)}
+  .b-gray{background:var(--surface-2);color:var(--text-2)}
+
+  /* ===== 健康分 ===== */
+  .score-hero{display:flex;gap:16px;align-items:center}
+  .ring{position:relative;width:96px;height:96px;flex-shrink:0}
+  .ring-num{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center}
+  .ring-num b{font-size:26px;font-weight:600;letter-spacing:-1px;line-height:1}
+  .ring-num span{font-size:9.5px;color:var(--text-3);margin-top:2px}
+
+  /* ===== 诊断行 ===== */
+  .diag{display:flex;gap:9px;align-items:flex-start;padding:9px 0;
+    border-bottom:1px solid var(--border)}
+  .diag:last-child{border-bottom:none;padding-bottom:0}
+  .dsev{width:3px;border-radius:2px;align-self:stretch;flex-shrink:0;min-height:30px}
+  .dsev.high{background:var(--red)} .dsev.mid{background:var(--amber)} .dsev.low{background:var(--blue)}
+  .dbody{flex:1;min-width:0}
+  .dtxt{font-size:12.5px;line-height:1.45;font-weight:500}
+  .dmeta{font-size:11px;color:var(--text-3);margin-top:3px;display:flex;gap:7px;flex-wrap:wrap}
+  .dnum{font-size:12.5px;font-weight:600;text-align:right;white-space:nowrap;
+    font-variant-numeric:tabular-nums}
+
+  /* ===== 表格 ===== */
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;font-size:10.5px;font-weight:600;color:var(--text-3);
+    padding:7px 9px;border-bottom:1px solid var(--border);white-space:nowrap;
+    background:var(--surface-2);position:sticky;top:0;z-index:1}
+  td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--surface-2)}
+  .num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:11.5px}
+  .tb-wrap{max-height:none;overflow:auto}
+
+  /* ===== 热力条 ===== */
+  .heat{display:flex;gap:3px;align-items:flex-end;height:110px;padding:0 2px}
+  .hbar{flex:1;min-width:5px;border-radius:2px 2px 0 0;position:relative;cursor:pointer;
+    transition:opacity .12s}
+  .hbar:hover{opacity:.75}
+  .heat-x{display:flex;gap:3px;font-size:9.5px;color:var(--text-3);margin-top:5px;padding:0 2px}
+  .heat-x span{flex:1;min-width:5px;text-align:center;overflow:hidden}
+
+  /* ===== 四象限 ===== */
+  .quad{position:relative;height:230px;border-left:1px solid var(--border);
+    border-bottom:1px solid var(--border);margin:14px 8px 26px 30px}
+  .qd{position:absolute;font-size:10px;color:var(--text-3);letter-spacing:.3px}
+  .qpt{position:absolute;border-radius:50%;cursor:pointer;transition:transform .12s}
+  .qpt:hover{transform:scale(1.35);z-index:5}
+  .q-lbl{position:absolute;font-size:10.5px;color:var(--text-2);white-space:nowrap;
+    transform:translate(-50%,-50%)}
+
+  /* ===== 漏斗 ===== */
+  .fun{display:flex;flex-direction:column;gap:4px}
+  .fs{display:grid;grid-template-columns:96px 1fr 76px 84px;gap:10px;align-items:center}
+  .fsn{font-size:11.5px;color:var(--text-2);white-space:nowrap}
+  .fsw{height:20px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+  .fsb{height:100%;border-radius:4px;transition:width .5s}
+  .fsv{font-size:11.5px;font-weight:600;text-align:right;font-family:var(--mono)}
+  .fsr{font-size:11px;text-align:right;font-variant-numeric:tabular-nums}
+  .fs.break .fsn{color:var(--red);font-weight:600}
+  .btag{font-size:9.5px;background:var(--red);color:#fff;padding:0 4px;
+    border-radius:3px;margin-left:4px;font-weight:500}
+
+  /* ===== 时间轴图 ===== */
+  .chart{position:relative;height:170px;width:100%}
+  .lg{display:flex;gap:14px;font-size:10.5px;color:var(--text-2);margin-bottom:8px;flex-wrap:wrap}
+  .lg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+
+  /* ===== 方案 ===== */
+  .plan{background:var(--surface-2);border-radius:var(--radius-sm);padding:11px 12px;margin-top:9px}
+  .plan-t{font-size:11.5px;font-weight:600;margin-bottom:8px;color:var(--text)}
+  .step{display:flex;gap:9px;padding:5px 0;font-size:11.5px;line-height:1.5}
+  .step-n{width:16px;height:16px;border-radius:50%;background:var(--text);color:#fff;
+    font-size:9.5px;display:grid;place-items:center;flex-shrink:0;margin-top:1px;font-weight:600}
+  .step-l{font-weight:600;color:var(--text);flex-shrink:0}
+  .step-d{color:var(--text-2)}
+  .tpl{margin-top:9px;padding:9px 11px;background:#1C1C1A;color:#E8E8E3;border-radius:6px;
+    font-size:11.5px;line-height:1.6;position:relative}
+  .tpl::before{content:'话术/模板';position:absolute;top:-7px;left:10px;
+    font-size:9px;background:var(--surface-2);color:var(--text-3);padding:0 5px;border-radius:3px}
+  .sched{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}
+  .sched th{background:transparent;border-bottom:1px solid var(--border-strong);
+    font-size:10px;padding:5px 8px}
+  .sched td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+  .sched tr:last-child td{border-bottom:none}
+  .stime{font-family:var(--mono);font-size:10.5px;color:var(--text-2);white-space:nowrap}
+
+  /* ===== 折叠问题卡 ===== */
+  .iss{border:1px solid var(--border);border-radius:var(--radius-sm);
+    margin-bottom:8px;overflow:hidden;background:var(--surface)}
+  .iss-h{display:grid;grid-template-columns:3px 1fr auto auto;gap:11px;align-items:center;
+    padding:11px 13px;cursor:pointer}
+  .iss-h:hover{background:var(--surface-2)}
+  .iss-t{font-size:12.5px;font-weight:500;line-height:1.4}
+  .iss-m{font-size:10.5px;color:var(--text-3);margin-top:2px}
+  .iss-a{font-size:9.5px;color:var(--text-3);transition:transform .16s}
+  .iss.open .iss-a{transform:rotate(90deg)}
+  .iss-b{display:none;padding:2px 13px 13px 27px}
+  .iss.open .iss-b{display:block}
+  .sect{margin-bottom:11px}
+  .sect-l{font-size:10px;font-weight:600;color:var(--text-3);letter-spacing:.5px;margin-bottom:5px}
+  .ev{background:var(--surface-2);border-radius:5px;padding:9px 11px;font-size:11.5px}
+  .ev-r{display:flex;justify-content:space-between;gap:12px;padding:2px 0}
+  .ev-r b{font-weight:600;font-family:var(--mono);text-align:right}
+  .sect p{font-size:12px;color:var(--text-2);line-height:1.6}
+  .sect ul{margin:0;padding-left:16px}
+  .sect li{font-size:12px;color:var(--text-2);margin-bottom:3px;line-height:1.5}
+  .rec{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;
+    background:var(--purple-bg);color:var(--purple);padding:2px 8px;border-radius:4px;
+    font-weight:500;margin-bottom:9px}
+
+  /* ===== 待办 ===== */
+  .td{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+  .td:last-child{border-bottom:none}
+  .td input{margin-top:3px;width:14px;height:14px;accent-color:#1C1C1A;cursor:pointer;flex-shrink:0}
+  .td-b{flex:1;min-width:0;cursor:pointer}
+  .td-t{font-size:12px;line-height:1.5}
+  .td input:checked + .td-b .td-t{text-decoration:line-through;color:var(--text-3)}
+  .td-tags{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
+  .tg{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--surface-2);color:var(--text-2)}
+  .tg.p0{background:var(--red-bg);color:var(--red);font-weight:500}
+  .tg.p1{background:var(--amber-bg);color:var(--amber);font-weight:500}
+  .tg.p2{background:var(--blue-bg);color:var(--blue);font-weight:500}
+
+  /* ===== 导入 ===== */
+  .imp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px}
+  .imp{border:1.5px dashed var(--border-strong);border-radius:var(--radius-sm);
+    padding:14px 11px;text-align:center;cursor:pointer;transition:all .13s;background:var(--surface)}
+  .imp:hover{border-color:var(--text-3);background:var(--surface-2)}
+  .imp.on{border-style:solid;border-color:var(--text);background:var(--surface-2)}
+  .imp .ic{font-size:16px;margin-bottom:6px;opacity:.7}
+  .imp h4{font-size:12px;font-weight:600;margin-bottom:3px}
+  .imp p{font-size:10.5px;color:var(--text-3);line-height:1.4}
+  textarea{width:100%;min-height:150px;padding:11px;border:1px solid var(--border-strong);
+    border-radius:var(--radius-sm);font-family:var(--mono);font-size:11.5px;line-height:1.6;
+    resize:vertical;background:var(--surface);color:var(--text)}
+  textarea:focus{outline:none;border-color:var(--text)}
+  select,.inp{padding:6px 9px;border:1px solid var(--border-strong);border-radius:6px;
+    font-size:12px;background:var(--surface);color:var(--text);font-family:inherit}
+  select:focus,.inp:focus{outline:none;border-color:var(--text)}
+  .note{font-size:11.5px;color:var(--text-2);background:var(--surface-2);
+    border-radius:var(--radius-sm);padding:11px 13px;line-height:1.65}
+  .note b{color:var(--text);font-weight:600}
+  .warn{font-size:11.5px;background:var(--amber-bg);color:#7A5210;border-radius:var(--radius-sm);
+    padding:10px 13px;line-height:1.6;margin-bottom:11px}
+
+  .chips{display:flex;gap:5px;flex-wrap:wrap}
+  .chip{font-size:10.5px;padding:2px 8px;border-radius:20px;background:var(--surface-2);
+    color:var(--text-2);border:1px solid var(--border);white-space:nowrap}
+  .chip.ok{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
+  .chip.miss{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
+  .chip.hi{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
+
+  .hidden{display:none!important}
+  .mt8{margin-top:8px} .mt12{margin-top:12px} .mb8{margin-bottom:8px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .meta-row{padding-top:10px;border-top:1px dashed var(--border)}
+  .meta-row .muted{min-width:52px}
+  .muted{color:var(--text-3);font-size:11px}
+
+  /* 场次库 */
+  .lib-list{display:flex;flex-direction:column;gap:8px}
+  .lib-row{display:grid;grid-template-columns:82px minmax(0,1fr) repeat(5,58px) 60px 118px;gap:9px;align-items:center;
+    padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);
+    transition:border-color .15s, box-shadow .15s}
+  .lib-row:hover{border-color:var(--border-strong);box-shadow:0 2px 8px rgba(0,0,0,.05)}
+  .lib-row.cur{border-color:var(--accent);background:var(--accent-soft)}
+  .lib-date{font-weight:600;font-size:12px;font-variant-numeric:tabular-nums}
+  .lib-host{font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;min-width:0}
+  .lib-host b{color:var(--text);font-weight:600}
+  .lib-note{font-size:10px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lib-m{text-align:right;font-size:12px;font-variant-numeric:tabular-nums}
+  .lib-m span{display:block;font-size:9px;color:var(--text-3);margin-top:1px}
+  .lib-sc{display:flex;align-items:center;justify-content:center}
+  .lib-act{display:flex;gap:5px;justify-content:flex-end;flex-wrap:nowrap;min-width:0}
+  .lib-hd{display:grid;grid-template-columns:82px minmax(0,1fr) repeat(5,58px) 60px 118px;gap:9px;
+    padding:0 12px 6px;font-size:10px;color:var(--text-3);letter-spacing:.04em}
+  .lib-hd div:nth-child(n+3){text-align:right}
+  .mini{background:none;border:1px solid var(--border-strong);border-radius:5px;color:var(--text-3);
+    font-size:11px;padding:2px 6px;cursor:pointer;line-height:1.4;white-space:nowrap}
+  .mini:hover{color:var(--text);border-color:var(--text-3)}
+  .mini.danger:hover{color:var(--red);border-color:var(--red)}
+  /* 待确认态的「确认删除」：实心红底，与灰色描边的「删」形成明确区别 */
+  .mini.danger2{color:#fff;background:var(--red);border-color:var(--red);font-weight:600}
+  .mini.danger2:hover{color:#fff;background:var(--red);opacity:.86}
+  /* 删除回执条 */
+  .delbar{margin:0 0 10px;padding:8px 12px;border:1px solid var(--border);
+    border-left:3px solid var(--red);border-radius:7px;font-size:12px;
+    color:var(--text-2);background:var(--bg-card)}
+  .empty-lib{text-align:center;padding:44px 20px;color:var(--text-3)}
+  .empty-lib .big{font-size:30px;margin-bottom:10px;opacity:.4}
+  /* 对比选择器 */
+  .pick{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-3)}
+  .pick select{font-size:11px;padding:4px 7px}
+  .empty{padding:26px 14px;text-align:center;color:var(--text-3);font-size:12px}
+
+  @media(max-width:1200px){
+    .g4{grid-template-columns:repeat(2,1fr)}
+    .g21,.g12,.g31{grid-template-columns:1fr}
+    .g3{grid-template-columns:repeat(2,1fr)}
+  }
+  @media(max-width:960px){
+    .side{display:none}
+    .g4,.g3,.g2{grid-template-columns:1fr}
+    .scroll{padding:10px 12px 50px}
+    /* 场次清单在窄屏换成卡片式。
+       9 列网格最小宽度约 616px（固定列 544 + 间隙 72），再加上 #scroll 是 overflow-x:auto，
+       内容一溢出就被裁掉 → 操作列（含「删」）实际不可点。
+       实测漏网区是 vw∈[821,891]，所以断点取 960（vw>960 时内容区 ≥771px，留足余量）。
+       这里改成竖排 + 指标带标签，保证删除按钮永远在屏幕内。 */
+    .lib-hd{display:none}
+    .lib-row{display:block;padding:12px}
+    .lib-date{font-size:13px;margin-bottom:3px}
+    .lib-host{margin-bottom:9px}
+    .lib-m{display:inline-block;text-align:left;margin:0 16px 6px 0;font-size:12.5px}
+    .lib-m::before{content:attr(data-l) " ";font-size:10px;color:var(--text-3);
+      font-weight:400;font-variant-numeric:normal}
+    .lib-sc{justify-content:flex-start;margin:2px 0 10px}
+    .lib-sc::before{content:"健康分 ";font-size:10px;color:var(--text-3);margin-right:5px}
+    .lib-act{justify-content:flex-start;gap:8px}
+    .lib-act .mini{padding:7px 14px;font-size:12.5px;border-radius:6px}
+  }
+
+  /* ===== 裁决卡 ===== */
+  .vcard{border-radius:var(--radius);border:1px solid;padding:15px 17px;margin-bottom:12px}
+  .vcard .vk{font-size:10.5px;font-weight:600;letter-spacing:.5px;margin-bottom:5px;opacity:.85}
+  .vcard .vh{font-size:16px;font-weight:600;letter-spacing:-.3px;line-height:1.45;margin-bottom:8px}
+  .vcard .vr{font-size:12px;line-height:1.75}
+  .vmeta{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;padding-top:9px;
+    border-top:1px solid rgba(0,0,0,.07);font-size:11px;color:var(--text-2)}
+  /* ===== 链路拆解 ===== */
+  .chain{display:flex;align-items:stretch;overflow-x:auto;padding:2px 0 4px}
+  .chain-i{flex:1;min-width:112px;padding:9px 11px;border-right:1px solid var(--border);border-radius:6px}
+  .chain-i:last-child{border-right:none}
+  .chain-i.broken{background:var(--red-bg)}
+  .chain-i.weak{background:var(--amber-bg)}
+  .chain-i.strong{background:var(--green-bg)}
+  .chain-l{font-size:10.5px;color:var(--text-3);margin-bottom:5px;white-space:nowrap}
+  .chain-v{font-size:17px;font-weight:600;letter-spacing:-.5px;line-height:1.15}
+  .chain-b{font-size:10.5px;color:var(--text-3);margin-top:3px}
+  .chain-g{font-size:10.5px;font-weight:600;margin-top:4px;white-space:nowrap}
+  /* ===== 动作卡 ===== */
+  .act{border:1px solid var(--border);border-left-width:3px;border-radius:var(--radius-sm);
+    padding:11px 13px;margin-bottom:9px;background:var(--surface)}
+  .act.p0{border-left-color:var(--red)}
+  .act.p1{border-left-color:var(--amber)}
+  .act.p2{border-left-color:var(--blue)}
+  .act-h{display:flex;align-items:center;gap:7px;margin-bottom:6px;flex-wrap:wrap}
+  .act-do{font-size:12.5px;font-weight:600;line-height:1.5}
+  .act-row{font-size:11.5px;color:var(--text-2);line-height:1.7;margin-top:5px}
+  .act-row b{color:var(--text);font-weight:600}
+  /* ===== 保存状态 ===== */
+  .svdot{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;padding:2px 8px;
+    border-radius:20px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:default}
+  .svdot i{width:6px;height:6px;border-radius:50%;display:block;flex-shrink:0}
+  .svdot.ok i{background:var(--green)}
+  .svdot.bad{border-color:var(--red-line);background:var(--red-bg);color:var(--red)}
+  .svdot.bad i{background:var(--red)}
+  .svdot.warn{border-color:var(--amber-line);background:var(--amber-bg);color:var(--amber)}
+  .svdot.warn i{background:var(--amber)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="side">
+    <div class="brand">
+      <h1>复盘台</h1>
+      <p>直播运营作战系统</p>
+    </div>
+    <nav class="nav">
+      <div class="nav-sec">数据</div>
+      <div class="nav-i on" data-v="import" onclick="go('import')"><span class="ii">↓</span>导入数据</div>
+      <div class="nav-i" data-v="library" onclick="go('library')"><span class="ii">▦</span>场次库<span class="cnt" id="libCnt" style="display:none">0</span></div>
+      <div class="nav-sec">分析</div>
+      <div class="nav-i" data-v="report" onclick="go('report')"><span class="ii">◉</span>单场诊断<span class="cnt" id="navCnt" style="display:none">0</span></div>
+      <div class="nav-i" data-v="compare" onclick="go('compare')"><span class="ii">⇄</span>场次对比</div>
+      <div class="nav-i" data-v="host" onclick="go('host')"><span class="ii">☺</span>主播对比</div>
+      <div class="nav-i" data-v="trend" onclick="go('trend')"><span class="ii">↗</span>趋势看板</div>
+      <div class="nav-sec">管理</div>
+      <div class="nav-i" data-v="issues" onclick="go('issues')"><span class="ii">☰</span>问题库</div>
+      <div class="nav-i" data-v="action" onclick="go('action')"><span class="ii">✓</span>行动清单</div>
+    </nav>
+    <div class="side-foot">数据全程本地计算<br>不上传服务器</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar" id="topbar">
+      <div class="tb-back" id="tbBack"></div>
+      <div class="tb-title" id="tbTitle">导入数据</div>
+      <div class="tb-sep"></div>
+      <div class="tb-meta" id="tbMeta">粘贴后台数据即可，无需整理格式</div>
+      <div class="tb-right" id="tbRight"></div>
+    </div>
+    <!-- 窄屏下的换页菜单：窄屏时侧栏是 display:none，没有它就没法换页 -->
+    <div class="vmenu" id="viewMenu" style="display:none"></div>
+    <div class="tabs" id="tabs" style="display:none"></div>
+    <div class="scroll" id="scroll"></div>
+  </div>
+</div>
+
+<script src="engine.js"></script>
+<script src="store.js"></script>
+<script>
+/* ==================== 状态 ==================== */
+/* 场次仓库：所有页面统一从这里读历史，不再用硬编码假数据 */
+const STORE = createStore(createLocalBackend());
+
+let ST = {
+  view:'import',
+  MODE:'paste',
+  text:'',
+  cat:'服饰',
+  M:null, DIAG:null,
+  curId:null,          // 当前诊断的场次 id（存入仓库后回填）
+  todos:[],
+  history:null,
+  // 导入时填写的元信息
+  hostName:'未命名主播',
+  date:'',
+  note:'',
+  // 当前对比口径
+  compareId:null,      // 场次对比选中的对比对象
+  trendMetric:'gmv',
+  trendRange:14,
+  // 每个页面记住自己当前选中的维度板块（子页签）
+  tab:{},
+  // 导航历史栈：记录「这一步之前在看哪」。
+  // 没有它，用户点进「看完整结论」就回不到本场数据了——只能靠侧栏重新点，
+  // 而窄屏下侧栏是隐藏的，等于彻底困住。
+  nav:[],
+  // 程序化写过的 hash 队列：hashchange 里撞上它们，就说明是自己写的，
+  // 不是用户按了后退键。（用布尔锁在连续快速跳转时会漏中间值）
+  _hashQueue:[],
+  // 决策结果缓存（key = 本场id + 对比场id），避免每次渲染重算
+  _dec:null, _decKey:'',
+  // 最近一次存档的回执（渲染在诊断页顶部）
+  saveNote:null,
+  // 删除采用「行内两阶段确认」：第一次点「删」进入待确认态，
+  // 该行按钮当场变成「确认删除 / 取消」，第二次点才真删。
+  // 不用原生 confirm 的原因：浏览器屏蔽对话框时（隐私模式、部分手机浏览器、
+  // 勾过「阻止此页面创建更多对话框」）confirm 静默返回 false，
+  // 表现就是「点了删除毫无反应」—— 这正是「删除按钮点不了」的一种成因。
+  delPending:null,
+  // 删除回执（渲染在场次库顶部），让操作有明确结果
+  delNote:null,
+};
+
+/* ==================== 示例数据 ==================== */
+const DEMO_TIME = `时间	在线人数	成交金额	讲解商品
+19:00	820	0	开场暖场
+19:10	1640	120	基础款T恤
+19:20	2480	860	基础款T恤
+19:30	3260	1420	基础款T恤
+19:40	2240	640	针织开衫
+19:50	1980	410	针织开衫
+20:00	2140	980	牛仔裤
+20:10	3420	2680	牛仔裤
+20:20	3180	2240	牛仔外套
+20:30	2960	1960	牛仔外套
+20:40	2380	880	针织开衫
+20:50	2260	760	针织开衫
+21:00	4120	3420	风衣
+21:10	3860	3180	风衣
+21:20	3520	2640	风衣
+21:30	3080	1880	针织开衫
+21:40	2640	1240	毛衣
+21:50	2280	940	毛衣
+22:00	1860	620	牛仔裤
+22:10	1480	480	牛仔裤
+22:20	1240	340	福利款
+22:30	980	260	福利款
+22:40	760	180	收尾
+22:50	540	120	收尾`;
+
+const DEMO_SUM = `观看人数	9600
+曝光人数	51500
+平均在线	1800
+峰值在线	4120
+平均停留时长	41秒
+GMV	¥86,420
+成交订单数	654
+退款率	18.6%
+进入率	18.6%
+商品点击率	23.0%
+成交转化率	6.8%
+付费流量占比	34%
+自然流量占比	62%
+评论数	4280
+新增粉丝	862`;
+
+const DEMO_PROD = `商品名称	商品点击率	成交转化率	销售额
+基础款T恤	26.1%	8.4%	18240
+针织开衫	21.4%	2.1%	7080
+牛仔裤	28.8%	7.9%	16420
+牛仔外套	31.2%	9.4%	14860
+风衣	29.6%	8.1%	15680
+毛衣	23.1%	5.2%	6240
+福利款	34.2%	11.2%	7900`;
+
+const DEMO_SRC = `流量来源	观看人数	进入率
+自然推荐	4960	20.8%
+关注粉丝	1900	24.1%
+千川付费	2170	13.2%
+搜索	615	26.4%
+短视频引流	485	15.6%`;
+
+/* 历史场次与主播：全部来自场次仓库，不再硬编码 */
+/* 用法见 store.js —— STORE.all() / STORE.ordered() / STORE.byHost() / STORE.baseline() */
+
+/* ==================== 路由 ==================== */
+const VIEWS = {
+  import: {title:'导入数据', meta:'粘贴后台数据即可，无需整理格式', ii:'↓', g:'录入'},
+  library:{title:'场次库', meta:'你导入过的每一场都在这里，对比和趋势都基于它', ii:'▦', g:'录入'},
+  report: {title:'单场诊断', meta:'', ii:'◉', g:'分析'},
+  compare:{title:'场次对比', meta:'本场 vs 对比场 vs 历史均值', ii:'⇄', g:'分析'},
+  host:   {title:'主播对比', meta:'同货盘下不同主播的效率差异', ii:'☺', g:'分析'},
+  trend:  {title:'趋势看板', meta:'核心指标长期走势，看能力是否在提升', ii:'↗', g:'分析'},
+  issues: {title:'问题库', meta:'跨场追踪反复出现的问题', ii:'☰', g:'管理'},
+  action: {title:'行动清单', meta:'下场要改的事，可勾选跟踪', ii:'✓', g:'管理'},
+};
+
+/* ---------------------------------------------------------------
+   维度板块（子页签）
+   每个分析页拆成若干可点选的维度，一次只渲染一个板块，
+   避免一路往下滚。badge 用于在页签上显示条目数。
+-----------------------------------------------------------------*/
+const SUBTABS = {
+  report: [
+    {k:'overview', t:'总览',       ii:'◉'},
+    {k:'funnel',   t:'转化漏斗',   ii:'▽'},
+    {k:'traffic',  t:'流量与时段', ii:'◫'},
+    {k:'product',  t:'商品表现',   ii:'▦'},
+    {k:'issues',   t:'问题诊断',   ii:'☰', badge:()=>ST.DIAG?ST.DIAG.issues.length:0, hot:true},
+    {k:'action',   t:'行动清单',   ii:'✓', badge:()=>ST.todos.filter(t=>!t.done).length},
+  ],
+  compare: [
+    {k:'verdict', t:'结论与决策', ii:'★', badge:()=>{ const d=cmpDecide(); return d?d.actions.length:0; }, hot:true},
+    {k:'gap',    t:'差距概览', ii:'⇄'},
+    {k:'detail', t:'指标明细', ii:'▤'},
+    {k:'trend',  t:'走势对比', ii:'↗'},
+  ],
+  host: [
+    {k:'rank',    t:'效率排行', ii:'①'},
+    {k:'profile', t:'能力诊断', ii:'◔'},
+  ],
+  trend: [
+    {k:'chart',   t:'走势图',   ii:'↗'},
+    {k:'insight', t:'趋势解读', ii:'✎'},
+    {k:'table',   t:'指标明细', ii:'▤'},
+  ],
+  issues: [
+    {k:'track', t:'问题追踪', ii:'☰', badge:()=>chronicCount(), hot:true},
+    {k:'plan',  t:'整改建议', ii:'✓'},
+  ],
+  action: [
+    {k:'todo',  t:'待办清单',   ii:'☰'},
+    {k:'owner', t:'分工与验证', ii:'☺'},
+  ],
+};
+function chronicCount(){
+  try{
+    const t = STORE.issueTrends();
+    return t.filter(x=>x.level==='chronic').length;
+  }catch(e){ return 0; }
+}
+function tabsOf(v){ return SUBTABS[v] || []; }
+/* 当前生效的子页签（无效值回落到第一个） */
+function curTab(v){
+  const list = tabsOf(v);
+  if(!list.length) return null;
+  const want = ST.tab[v];
+  return list.some(x=>x.k===want) ? want : list[0].k;
+}
+/* 渲染页签条 */
+function renderTabs(){
+  const box = document.getElementById('tabs');
+  if(!box) return;
+  const list = tabsOf(ST.view);
+  if(list.length < 2){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='';
+  const cur = curTab(ST.view);
+  box.innerHTML = list.map(x=>{
+    let n = '';
+    if(x.badge){
+      let c = 0;
+      try{ c = x.badge() || 0; }catch(e){ c = 0; }
+      if(c) n = `<span class="tb-n${x.hot?' hot':''}">${c}</span>`;
+    }
+    return `<div class="tab${x.k===cur?' on':''}" onclick="setTab('${x.k}')">${
+      x.ii?`<span style="font-size:10px;opacity:.65">${x.ii}</span>`:''}${x.t}${n}</div>`;
+  }).join('');
+}
+/* 切换维度板块 */
+function setTab(k){
+  const prev = curTab(ST.view);
+  if(prev !== k) navPush();      // 记住「切换前在看哪个板块」，返回键才有得回
+  ST.tab[ST.view] = k;
+  renderTabs();
+  const S = document.getElementById('scroll');
+  if(S) S.scrollTop = 0;
+  renderView(ST.view);
+  syncHash();
+  renderBack();
+}
+/* 统一的分发入口：go() 与 setTab() 都走这里 */
+function renderView(v){
+  const fn = {import:renderImport, library:renderLibrary, report:renderReport,
+    compare:renderCompare, host:renderHost, trend:renderTrend,
+    issues:renderIssues, action:renderAction}[v];
+  if(fn) fn();
+  renderTabs();
+}
+
+/* ============================================================
+   导航历史与返回键
+   ------------------------------------------------------------
+   为什么需要：从「单场诊断」点「看完整结论」跳到「场次对比·结论与决策」后，
+   原本没有任何回到本场数据的入口——宽屏还能靠侧栏重新点，窄屏侧栏是
+   display:none，用户就彻底出不来了。
+   现在有两条退路：① 顶栏常驻「← 返回」；② 浏览器自己的后退键（hash 路由）。
+   ============================================================ */
+const ANALYZE_VIEWS = ['report','compare','host','trend','issues','action'];
+
+/* 给一个历史条目起个人话名字，用于返回按钮上的提示：「单场诊断 · 转化漏斗」 */
+function locLabel(e){
+  if(!e) return '';
+  const V = VIEWS[e.v] || {};
+  const list = tabsOf(e.v);
+  const t = list.length>1 ? ((list.filter(x=>x.k===e.k)[0]||{}).t || '') : '';
+  const base = V.title || e.v;
+  return t ? (base + ' · ' + t) : base;
+}
+/* 把「当前所在位置」压栈（记录的是出发点，不是目标） */
+function navPush(){
+  const cur = {v:ST.view, k:curTab(ST.view)};
+  const top = ST.nav[ST.nav.length-1];
+  if(top && top.v===cur.v && top.k===cur.k) return;   // 连续相同不重复压
+  ST.nav.push(cur);
+  if(ST.nav.length > 40) ST.nav.shift();              // 防止无限增长
+}
+/* 返回上一步。连续遇到与当前完全相同的位置就跳过，避免「按了没反应」。 */
+function navBack(){
+  while(ST.nav.length){
+    const e = ST.nav.pop();
+    const same = e.v===ST.view && (e.k||null)===(curTab(ST.view)||null);
+    if(same) continue;
+    go(e.v, {from:'back', k:e.k});
+    return true;
+  }
+  renderBack();      // 栈空了就把返回键收起来
+  return false;
+}
+/* 渲染顶栏返回键 */
+function renderBack(){
+  const box = document.getElementById('tbBack');
+  if(!box) return;
+  const e = ST.nav[ST.nav.length-1];
+  if(!e){ box.innerHTML = ''; return; }
+  const lb = locLabel(e);
+  box.innerHTML = `<button class="btn back sm" onclick="navBack()" title="回到：${esc(lb)}">← 返回<span class="bk-lb">· ${esc(lb)}</span></button>`;
+}
+
+/* ---- 窄屏页面切换菜单（侧栏在 820px 以下被隐藏，没有它就没法换页） ---- */
+function renderViewMenu(){
+  const box = document.getElementById('viewMenu');
+  if(!box) return;
+  let last = '';
+  box.innerHTML = Object.keys(VIEWS).map(v=>{
+    const V = VIEWS[v];
+    let head = '';
+    if(V.g !== last){ last = V.g; head = `<div class="vm-sec">${last}</div>`; }
+    return head + `<div class="vm-i${v===ST.view?' on':''}" onclick="go('${v}');closeViewMenu()">`+
+      `<span class="ii">${V.ii||'·'}</span>${V.title}</div>`;
+  }).join('');
+}
+function toggleViewMenu(ev){
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  const box = document.getElementById('viewMenu');
+  if(!box) return;
+  if(box.style.display !== 'none'){ box.style.display='none'; return; }
+  renderViewMenu();
+  box.style.display = 'block';
+}
+function closeViewMenu(){
+  const box = document.getElementById('viewMenu');
+  if(box && box.style.display !== 'none') box.style.display = 'none';
+}
+
+/* ---- hash 路由：让浏览器自带的后退/前进键也能用 ---- */
+function curHash(){
+  const t = tabsOf(ST.view).length>1 ? curTab(ST.view) : '';
+  return '#/' + ST.view + (t ? '/' + t : '');
+}
+function syncHash(){
+  // 桩环境（Node 里跑测试）没有 location，直接跳过
+  if(typeof location === 'undefined' || !location) return;
+  try{
+    const want = curHash();
+    if(location.hash === want) return;
+    ST._hashQueue.push(want);
+    if(ST._hashQueue.length > 30) ST._hashQueue.shift();
+    location.hash = want;
+  }catch(e){ /* 沙箱限制写 hash，忽略即可，不影响站内返回键 */ }
+}
+function initHashRouter(){
+  if(typeof window === 'undefined' || !window.addEventListener) return;
+  window.addEventListener('hashchange', function(){
+    let h = '';
+    try{ h = String((typeof location!=='undefined' && location && location.hash) || ''); }catch(e){ return; }
+    // 队列里命中 → 这是自己写进去的，跳过（连同它之前那些已被覆盖的中间值）
+    const qi = ST._hashQueue.indexOf(h);
+    if(qi >= 0){ ST._hashQueue.splice(0, qi+1); return; }
+    const p = h.replace(/^#\/?/, '').split('/').filter(Boolean);
+    const v = p[0];
+    if(!v || !VIEWS[v]) return;
+    const k = p[1] || undefined;
+    if(v===ST.view && (k===undefined || k===curTab(ST.view))) return;
+    // 浏览器自己回退了：把站内栈同步弹出，两套历史才不会打架
+    const top = ST.nav[ST.nav.length-1];
+    if(top && top.v===v && (k===undefined || top.k===k)) ST.nav.pop();
+    go(v, {from:'back', k:k});
+  });
+}
+
+function go(v, opt){
+  opt = opt || {};
+  // 分析类页面需先有数据；仓库类页面始终可进
+  if(ANALYZE_VIEWS.includes(v) && !ST.M && !STORE.count()){
+    v = 'import';
+  }
+  // 有历史但当前没载入诊断时，自动载入最新一场
+  if(ANALYZE_VIEWS.includes(v) && !ST.M && STORE.count()){
+    loadLatest();
+  }
+  // 普通跳转才记历史；返回/替换不入栈，否则返回键会来回弹
+  const staying = v===ST.view && (!opt.k || opt.k===curTab(ST.view));
+  if(!opt.from && !staying) navPush();
+  if(opt.k) ST.tab[v] = opt.k;
+  ST.delPending = null;   // 离开场次库就撤销「待确认」，避免状态残留
+  ST.view = v;
+  document.querySelectorAll('.nav-i').forEach(n=>n.classList.toggle('on', n.dataset.v===v));
+  document.getElementById('tbTitle').textContent = VIEWS[v].title;
+  document.getElementById('tbMeta').textContent = VIEWS[v].meta || '';
+  renderTopbar();
+  const S = document.getElementById('scroll');
+  if(S) S.scrollTop = 0;
+  renderView(v);
+  syncHash();
+  renderBack();
+  closeViewMenu();
+}
+
+/* 载入仓库里最新一场作为当前诊断 */
+function loadLatest(){
+  const latest = STORE.all()[0];
+  if(!latest) return false;
+  // 用原始文本重解析，保证与引擎版本一致
+  if(latest.raw){
+    const blocks = splitBlocks(latest.raw);
+    let recs=[], unk=[];
+    blocks.forEach(b=>{
+      const p = parseTable(parseDelimited(b));
+      recs = recs.concat(p.records); unk = unk.concat(p.unknown||[]);
+    });
+    const M = normalize(recs, {category:latest.category});
+    M.unknownFields = [...new Set(unk)].filter(Boolean);
+    ST.M = M;
+    ST.DIAG = runDiagnosis(M);
+    ST.history = STORE.issueTrends();
+  } else {
+    ST.M = null; ST.DIAG = null;
+  }
+  ST.curId = latest.id;
+  rebuildTodos();   // 必须放在 curId 之后：勾选状态是按「场次 id + 待办文本」查的
+  ST.cat = latest.category;
+  ST.hostName = latest.hostName;
+  ST.date = latest.date;
+  ST.note = latest.note;
+  ST.saveNote = null;
+  updateBadges();
+  return true;
+}
+
+/* 刷新侧栏徽标 */
+function updateBadges(){
+  const n = STORE.count();
+  const libC = document.getElementById('libCnt');
+  if(libC){ libC.textContent = n; libC.style.display = n ? '' : 'none'; }
+  const navC = document.getElementById('navCnt');
+  if(navC){
+    const c = ST.DIAG ? ST.DIAG.issues.length : 0;
+    navC.textContent = c; navC.style.display = c ? '' : 'none';
+  }
+  // 页签上的条数徽标同步刷新（问题数、待办数会随诊断变化）
+  if(tabsOf(ST.view).length) renderTabs();
+}
+
+function renderTopbar(){
+  const R = document.getElementById('tbRight');
+  const v = ST.view;
+
+  // 右侧第一项永远是保存状态：数据存不存得住，必须一眼可见
+  let btns = '';
+  if(v==='import'){
+    btns = `<button class="btn" onclick="loadDemo()">载入示例数据</button>`;
+  } else if(v==='report'){
+    btns = `<button class="btn sm" onclick="go('import')">重新导入</button>
+      <button class="btn sm" onclick="window.print()">导出</button>`;
+    const d = ST.DIAG;
+    if(d){
+      const tag = d.score>=85?'b-green':d.score>=70?'b-blue':d.score>=55?'b-amber':'b-red';
+      const lbl = d.score>=85?'优秀':d.score>=70?'良好':d.score>=55?'中等偏弱':'问题较多';
+      document.getElementById('tbMeta').innerHTML =
+        `<span class="badge ${tag}">健康分 ${d.score} · ${lbl}</span>`;
+    }
+  } else {
+    btns = `<button class="btn sm" onclick="go('import')">重新导入</button>`;
+  }
+  R.innerHTML = `<span class="only-narrow"><button class="btn sm" onclick="toggleViewMenu(event)">☰ 页面</button></span>`
+    + saveBadge() + btns;
+}
+
+/* 保存状态徽标：把「存没存住」这件事从隐性变成显性。
+   过去后端失败是静默的，用户第二天才发现数据没了——现在失败会红着显示。 */
+function saveBadge(){
+  let st;
+  try{ st = STORE.saveState(); }catch(e){ return ''; }
+  const n = STORE.count();
+  if(st.ok === null && !n){
+    return `<span class="svdot" title="还没有录入任何数据"><i style="background:var(--text-3)"></i>未录入</span>`;
+  }
+  if(!st.ok){
+    return `<span class="svdot bad" style="cursor:pointer" onclick="backupGuide()"
+      title="${esc(st.error||'保存失败')}"><i></i>未存住 · 点此备份</span>`;
+  }
+  return `<span class="svdot ok" title="已写入本机浏览器存储，关掉网页也不会丢"><i></i>已存本机 ${n} 场</span>`;
+}
+
+/* 导入前就做环境自检：如果这个浏览器根本存不住数据，提前讲清楚，
+   而不是等用户录了一周、第二天打开发现全没了。 */
+function envWarn(){
+  let hp;
+  try{ hp = STORE.health(); }catch(e){ return ''; }
+  if(hp.level !== 'bad') return '';
+  const has = hp.count > 0;
+  const btn = has
+    ? `<div style="margin-top:8px"><button class="btn sm" onclick="exportLib()">立即导出已录入的 ${hp.count} 场</button></div>`
+    : '';
+  return `<div class="note" style="background:var(--red-bg);border:1px solid var(--red-line);
+    color:var(--red);margin-bottom:12px;line-height:1.8">
+    <b>⚠ 这个浏览器存不住数据</b><br>
+    原因：${esc(hp.error || '浏览器拒绝了本地存储')}<br>
+    也就是说，现在录入的数据在关掉网页后会丢失。常见于：无痕/隐私模式、浏览器禁用了站点数据、存储空间已满。<br>
+    <b>怎么解决</b>：换用 Chrome 或 Edge 的<b>正常窗口</b>打开本页（不要用无痕模式）；
+    如果必须在这个环境用，每次录完点「导出备份」存成文件，下次用「导入备份」恢复。
+    ${btn}
+  </div>`;
+}
+
+/* 保存失败时的引导：先把内存里的数据导出来，别等它丢 */
+function backupGuide(){
+  const st = STORE.saveState();
+  const n = STORE.count();
+  const reason = st.error || '浏览器拒绝了本次存储（可能是隐私模式、禁用了站点数据，或存储已满）';
+  const msg = '数据没能写进本机存储。\n\n原因：' + reason + '\n\n'
+    + '当前内存里已有 ' + n + ' 场记录，但关掉网页就会丢。\n\n'
+    + '点「确定」立即导出成 JSON 文件保存到本地，之后可以再导回来。';
+  if(confirm(msg)){
+    try{ exportLib(); }catch(e){ alert('导出失败：'+e.message); }
+  }
+}
+
+/* ==================== 导入页 ==================== */
+function renderImport(){
+  document.getElementById('scroll').innerHTML = `
+  ${envWarn()}
+  <div class="grid g3">
+    ${impCard('paste','▥','复制粘贴','后台表格框选后直接贴', ST.MODE==='paste')}
+    ${impCard('file','▤','上传文件','CSV / TXT，UTF-8', ST.MODE==='file')}
+    <div class="imp" onclick="loadDemo()"><div class="ic">◈</div><h4>示例数据</h4><p>含分时段 / 商品 / 流量三表</p></div>
+  </div>
+  <div class="grid g3 mt12">
+    <div class="imp" onclick="seedDemoHistory()"><div class="ic">▦</div><h4>载入示例历史</h4><p>6 场 · 立刻体验对比与趋势</p></div>
+    <div class="imp" style="opacity:.5;cursor:not-allowed"><div class="ic">▣</div><h4>截图识别</h4><p>规划中 · 需 OCR 引擎</p></div>
+    <div class="imp" style="opacity:.5;cursor:not-allowed"><div class="ic">▶</div><h4>录播分析</h4><p>规划中 · 抽帧 + ASR</p></div>
+  </div>
+
+  <div class="grid g31">
+    <div class="card">
+      <div class="ch">
+        <div class="ct">粘贴数据 <span class="tagline">支持竖排 / 横排 / 多表混合</span></div>
+        <div class="cs" id="charCnt">0 字符</div>
+      </div>
+      <div id="pasteBox">
+        <textarea id="raw" placeholder="从后台框选复制，直接粘进来。
+
+竖排格式（后台汇总最常见）：
+观看人数	83120
+平均停留时长	41秒
+GMV	¥86,420
+
+横排格式（分时段/商品明细）：
+时间	在线人数	成交金额	讲解商品
+19:00	820	0	开场
+
+多张表用空行隔开即可，系统会自动分块识别。">${ST.text||''}</textarea>
+      </div>
+      <div id="fileBox" class="hidden">
+        <input type="file" id="fi" accept=".csv,.txt,.tsv" class="inp" style="width:100%">
+      </div>
+      <div class="row mt12">
+        <span class="muted">类目基准</span>
+        <select id="cat">
+          ${['服饰','美妆','食品','家居','日用','通用'].map(c=>`<option ${ST.cat===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+        <button class="btn pri" onclick="analyze()">开始诊断并存档</button>
+        <button class="btn" onclick="clearIn()">清空</button>
+      </div>
+      <div class="row mt12 meta-row">
+        <span class="muted">场次信息</span>
+        <input id="impDate" class="inp" type="date" value="${ST.date||todayStr()}" title="这一场是哪天的直播">
+        <input id="impHost" class="inp" placeholder="主播名（用于主播对比）" value="${ST.hostName&&ST.hostName!=='未命名主播'?ST.hostName:''}" style="width:150px">
+        <input id="impNote" class="inp" placeholder="备注（如：试了新开场 / 换了货盘）" value="${ST.note||''}" style="flex:1;min-width:160px">
+      </div>
+      <div class="note" style="font-size:11px;margin-top:8px">
+        <b>每天录一场，越用越准</b>：点「开始诊断并存档」，这一场就存进「场次库」，
+        <b>不会覆盖上一场</b>。明天导入新数据时，系统会自动拿它和今天这场对比，
+        并给出「比出了什么、差距在哪、该优化还是继续往下走」的结论。
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="ct mb8">支持识别的字段</div>
+        <div class="note">
+          <b>基础</b>：观看人数 / 曝光 / 平均在线 / 峰值 / 平均停留 / 评论 / 点赞 / 涨粉<br>
+          <b>成交</b>：GMV / 订单数 / 客单价 / 退款额 / 退款率<br>
+          <b>流量</b>：进入率 / 点击率 / 转化率 / 自然占比 / 付费占比 / GPM<br>
+          <b>分时段</b>：时间 + 在线人数 + 成交金额 + 讲解商品<br>
+          <b>商品</b>：商品名 + 点击率 + 转化率 + 销售额<br>
+          <b>流量来源</b>：渠道名 + 人数 + 进入率
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct mb8">自动处理</div>
+        <div class="note" style="font-size:11px">
+          <b>同义词</b>：场观 / 观看人次 / UV → 同一字段<br>
+          <b>单位</b>：12.4万 → 124000；¥86,420 → 86420；1分08秒 → 68 秒<br>
+          <b>缺值</b>：— / 横杠 视为缺失，不当成 0<br>
+          <b>时间</b>：19:00 原样保留，不会被当成数字<br>
+          <b>缺字段</b>：跳过对应分析，并在结果页明确标出
+        </div>
+      </div>
+    </div>
+  </div>`;
+  setMode(ST.MODE);
+  bindInput();
+}
+function impCard(mode,ic,h,p,on){
+  return `<div class="imp ${on?'on':''}" id="imp-${mode}" onclick="setMode('${mode}')">
+    <div class="ic">${ic}</div><h4>${h}</h4><p>${p}</p></div>`;
+}
+function setMode(m){
+  ST.MODE = m;
+  document.querySelectorAll('.imp').forEach(e=>e.classList.remove('on'));
+  const el = document.getElementById('imp-'+m);
+  if(el) el.classList.add('on');
+  const p = document.getElementById('pasteBox'), f = document.getElementById('fileBox');
+  if(p) p.classList.toggle('hidden', m!=='paste');
+  if(f) f.classList.toggle('hidden', m!=='file');
+}
+function bindInput(){
+  const t = document.getElementById('raw');
+  if(t){
+    t.addEventListener('input', e=>{
+      ST.text = e.target.value;
+      document.getElementById('charCnt').textContent = e.target.value.length + ' 字符';
+    });
+  }
+  const fi = document.getElementById('fi');
+  if(fi){
+    fi.addEventListener('change', e=>{
+      const f = e.target.files[0]; if(!f) return;
+      const rd = new FileReader();
+      rd.onload = ev => {
+        ST.text = ev.target.result;
+        setMode('paste');
+        if(document.getElementById('raw')) document.getElementById('raw').value = ST.text;
+        document.getElementById('charCnt').textContent = ST.text.length + ' 字符';
+      };
+      rd.readAsText(f,'UTF-8');
+    });
+  }
+}
+function clearIn(){ ST.text=''; const t=document.getElementById('raw'); if(t) t.value='';
+  document.getElementById('charCnt').textContent='0 字符'; }
+function loadDemo(){
+  ST.text = [DEMO_TIME, DEMO_SUM, DEMO_PROD, DEMO_SRC].join('\n\n');
+  ST.cat = '服饰';
+  ST.hostName = '小雨';
+  setMode('paste');
+  renderImport();
+  document.getElementById('cat').value = '服饰';
+  document.getElementById('charCnt').textContent = ST.text.length + ' 字符';
+}
+
+/* 载入示例历史：一次性生成 6 场，让对比/趋势/问题库立刻有内容 */
+function seedDemoHistory(){
+  if(STORE.count() && !confirm('将在现有 '+STORE.count()+' 场基础上再添加 6 场示例数据，继续？')) return;
+  const hosts = ['小雨','小雨','小满','阿静','小雨','小满'];
+  const notes = ['新开场试验','常规场','换了货盘','常规场','大促预热','常规场'];
+  // 6 场，指标逐场微调，形成有起伏的真实感
+  const days = [];
+  const now = new Date();
+  for(let i=5;i>=0;i--){
+    const d = new Date(now.getTime() - i*86400000);
+    const p = n => String(n).padStart(2,'0');
+    days.push(d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()));
+  }
+  const scenes = [
+    {views:9800,  stay:52, gmv:88000,  entry:19.2, cvr:8.2, refund:7.4, paid:32},
+    {views:10400, stay:58, gmv:104000, entry:20.4, cvr:9.1, refund:6.2, paid:30},
+    {views:9600,  stay:41, gmv:86420,  entry:19.4, cvr:6.8, refund:18.6,paid:34}, // 掉链子的一场
+    {views:11200, stay:61, gmv:118000, entry:21.0, cvr:9.8, refund:6.0, paid:28},
+    {views:10600, stay:56, gmv:96000,  entry:19.8, cvr:8.6, refund:7.0, paid:31},
+    {views:11800, stay:64, gmv:132000, entry:21.6,cvr:10.3,refund:5.6, paid:27},
+  ];
+  let added=0;
+  scenes.forEach((c,i)=>{
+    const M = normalize([{
+      views:c.views, avgStay:c.stay, gmv:c.gmv, entryRate:c.entry,
+      cvr:c.cvr, refundRate:c.refund, paidRate:c.paid,
+    }], {category:'服饰'});
+    const DIAG = runDiagnosis(M);
+    // 顺序写反了：scenes[0] 最早，days[0] 最早 —— 对应上
+    const r = STORE.add({
+      M, DIAG,
+      raw:`观看人数\t${c.views}\n平均停留时长\t${c.stay}秒\nGMV\t${c.gmv}\n曝光进入率\t${c.entry}%\n成交转化率\t${c.cvr}%\n退款率\t${c.refund}%\n付费流量占比\t${c.paid}%`,
+      category:'服饰', hostName:hosts[i], date:days[i], note:notes[i],
+    });
+    if(!r.dup) added++;
+  });
+  updateBadges();
+  alert('已添加 '+added+' 场示例历史，现在可以看场次对比、趋势看板、问题库了。');
+  go('library');
+}
+
+/* ==================== 分析主流程 ==================== */
+function analyze(){
+  const t = (ST.text||'').trim();
+  if(!t){ alert('请先粘贴数据，或点「载入示例数据」'); return; }
+  ST.cat = document.getElementById('cat') ? document.getElementById('cat').value : ST.cat;
+
+  const blocks = splitBlocks(t);
+  let recs=[], unk=[];
+  blocks.forEach(b=>{
+    const p = parseTable(parseDelimited(b));
+    recs = recs.concat(p.records); unk = unk.concat(p.unknown||[]);
+  });
+  const M = normalize(recs, {category:ST.cat});
+  M.unknownFields = [...new Set(unk)].filter(Boolean);
+  const DIAG = runDiagnosis(M);
+  ST.M = M; ST.DIAG = DIAG;
+  // 待办等本场 id 落地后再重建（见下方 rebuildTodos）——
+  // 勾选状态是按「场次 id + 待办文本」存的，id 还没确定就重建会串到别的场次去
+
+  // ---- 存档：把这一场写进仓库 ----
+  const meta = readImportMeta();
+  const res = STORE.add({
+    M, DIAG,
+    raw: t,
+    category: ST.cat,
+    hostName: meta.hostName,
+    date: meta.date,
+    note: meta.note,
+  });
+  ST.curId = res.record.id;
+  rebuildTodos();     // 本场 id 已确定，按它恢复勾选状态与手动加入的动作
+  ST.history = STORE.issueTrends();
+
+  // 存档回执：明确告诉用户「这一场记下来了没有、记成第几场」
+  // 过去这里没有反馈，用户不知道数据到底存没存住 —— 这是「昨天数据没了」的直接来源
+  // 重复导入时会切到「已存在的那一场」，所以回执必须说清切到哪一场，
+  // 否则用户会以为「我刚导入的数据怎么变成旧场次的结论了」。
+  ST.saveNote = res.dup
+    ? {k:'dup', txt:'这份数据和已存的第 '+(res.record.seq||'?')+' 场（'+res.record.date
+        +' · '+res.record.hostName+'）完全一致，没有重复记录（避免同一天录两遍把均值拉偏）。'
+        +'已切到那一场，下面的对比和结论都是按它算的。'}
+    : (res.saved
+        ? {k:'ok', txt:'已记录为第 ' + STORE.count() + ' 场（' + res.record.date + ' · ' + res.record.hostName + '）。下次导入会自动和这一场对比。'}
+        : {k:'bad', txt:'已记到内存，但没能写进本机存储——关掉网页会丢。请立即导出备份。'});
+  updateBadges();
+
+  ST.tab.report = 'overview';
+  go('report');
+}
+
+/* 读导入页填写的元信息 */
+function readImportMeta(){
+  const g = id => { const el = document.getElementById(id); return el ? (el.value||'').trim() : ''; };
+  const date = g('impDate') || (STORE.count() ? '' : '');
+  return {
+    hostName: g('impHost') || '未命名主播',
+    date: date || todayStr(),
+    note: g('impNote'),
+  };
+}
+function todayStr(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function splitBlocks(text){
+  const raw = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  const out = [];
+  raw.split(/\n\s*\n+/).forEach(p=>{
+    const c = p.split('\n').filter(l=>!/^\s*【.*】\s*$/.test(l)).join('\n');
+    if(c.trim()) out.push(c);
+  });
+  return out;
+}
+
+/* ==================== 单场诊断（按维度分板块） ==================== */
+/* 一次只渲染当前选中的维度板块，避免一条长页滚到底 */
+function renderReport(){
+  const M = ST.M, D = ST.DIAG, s = M.session;
+  if(!Object.keys(s).length){
+    document.getElementById('scroll').innerHTML =
+      `<div class="warn"><b>没有识别到有效数据。</b>请确认粘贴内容包含表头行（如「观看人数」「GMV」），且数值在表头下一行或右侧。</div>`;
+    return;
+  }
+  const tab = curTab('report');
+  let h = repMissWarn(M);
+  let after = null;
+
+  if(tab==='overview')      h += repOverview(M, D, s);
+  else if(tab==='funnel')   h += repFunnel(M, D, s);
+  else if(tab==='traffic'){ h += repTraffic(M, D, s); if(M.flags.hasTimeline) after = () => drawChart(M); }
+  else if(tab==='product')  h += repProduct(M, D, s);
+  else if(tab==='issues')   h += repIssues(D);
+  else if(tab==='action')   h += repActionSec();
+
+  document.getElementById('scroll').innerHTML = h;
+  if(after) requestAnimationFrame(after);
+}
+
+/* 缺失字段提示：各板块顶部共用 */
+function repMissWarn(M){
+  const miss = ['views','avgStay','gmv','entryRate','cvr'].filter(k=>M.flags[k]);
+  const missName = {views:'观看人数',avgStay:'平均停留',gmv:'GMV',entryRate:'进入率',cvr:'成交转化率'};
+  if(!miss.length && !M.unknownFields.length) return '';
+  return `<div class="warn">${miss.length?`<b>缺少字段</b>：${miss.map(k=>missName[k]).join('、')}，对应分析已跳过。`:''}
+    ${M.unknownFields.length?`<br><b>未能识别</b>：${M.unknownFields.slice(0,10).join('、')}。`:''}
+    ${M.flags.hasTimeline?'':'<br><b>无分时段数据</b>：已跳过时段热力、拐点定位与排期建议。'}</div>`;
+}
+
+/* 维度卡片：总览页的跳转入口 */
+function dimCard(tabKey, title, ii, lines){
+  return `<div class="dim" onclick="setTab('${tabKey}')">
+    <div class="dim-top">
+      <div class="dim-t"><span class="ii">${ii}</span>${title}</div>
+      <div class="dim-go">进入 →</div>
+    </div>
+    ${lines.map(([k,v,c])=>`<div class="dim-line"><span class="lb">${k}</span><b style="${c?'color:'+c:'color:var(--text)'}">${v}</b></div>`).join('')}
+  </div>`;
+}
+
+/* ---------- 板块 1：总览 ---------- */
+function repOverview(M, D, s){
+  const B = benchOf(ST.cat);
+  // 先给存档回执（这场存住了吗），再给裁决（这场该怎么办）
+  let h = saveNoteBar();
+  h += verdictBar();
+  h += `<div class="grid g4 mt12">
+    ${kpi('GMV','¥'+(s.gmv||0).toLocaleString(), s.gmv, null, 'red')}
+    ${kpi('UV 价值','¥'+fmt(s.uvValue), s.uvValue, B.uvValue, 'blue')}
+    ${kpi('平均停留', (s.avgStay!=null?s.avgStay+'s':'—'), s.avgStay, B.stay, 'amber')}
+    ${kpi('退款率', (s.refundRate!=null?s.refundRate+'%':'—'), s.refundRate, B.refundRate, 'purple', true)}
+  </div>`;
+
+  h += `<div class="grid g12">
+    <div class="card">
+      <div class="ch"><div class="ct">健康分</div></div>
+      ${scoreRing(D.score)}
+      <div class="mt12" style="font-size:11.5px;color:var(--text-2);line-height:1.6">
+        ${D.issues.length ? `检出 <b style="color:var(--red)">${D.issues.filter(i=>i.sev==='high').length}</b> 项严重问题 ·
+          <b style="color:var(--amber)">${D.issues.filter(i=>i.sev==='mid').length}</b> 项需关注` : '各项指标正常'}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ch">
+        <div class="ct">核心结论</div>
+        <div class="cs">按影响程度排序</div>
+      </div>
+      ${D.issues.slice(0,5).map(it=>`
+        <div class="diag">
+          <div class="dsev ${it.sev}"></div>
+          <div class="dbody">
+            <div class="dtxt">${it.title}</div>
+            <div class="dmeta">
+              <span class="badge ${it.sev==='high'?'b-red':it.sev==='mid'?'b-amber':'b-blue'}">${it.sev==='high'?'P0':it.sev==='mid'?'P1':'P2'}</span>
+              <span>${it.meta}</span>
+            </div>
+          </div>
+          <div class="dnum">${shortNum(it)}</div>
+        </div>`).join('') || '<div class="empty">未检出明显问题</div>'}
+      ${D.issues.length>5?`<div class="mt8" style="text-align:right">
+        <button class="btn sm" onclick="setTab('issues')">查看全部 ${D.issues.length} 项 →</button></div>`:''}
+    </div>
+  </div>`;
+
+  /* 关键指标 + 数据完整度 */
+  const rows2 = [
+    ['曝光人数', s.exposure, null, ''],
+    ['观看人数', s.views, null, ''],
+    ['峰值在线', s.peakOnline, null, ''],
+    ['客单价', s.aov, B.aov, '¥'],
+    ['订单数', s.orders, null, ''],
+    ['GPM', s.gpm, null, '¥'],
+    ['自然流量占比', s.naturalRate, B.naturalRate, '%'],
+    ['付费流量占比', s.paidRate, null, '%'],
+  ];
+  h += `<div class="grid g21">`;
+  h += `<div class="card"><div class="ch"><div class="ct">关键指标 <span class="tagline">vs 类目基准</span></div></div>
+    <div class="tb-wrap"><table><tbody>`;
+  rows2.forEach(([k,v,b,p])=>{
+    if(v==null) return;
+    let d = '';
+    if(b!=null){
+      const diff = v-b;
+      const cls = diff>0?'up':(diff<0?'down':'flat');
+      d = `<span class="${cls}" style="font-size:10.5px">${diff>0?'▲':'▼'}${Math.abs(diff).toFixed(1)}</span>`;
+    }
+    h += `<tr><td style="color:var(--text-2)">${k}</td>
+      <td class="num">${p}${typeof v==='number'?v.toLocaleString():v}</td>
+      <td style="text-align:right;width:60px">${d}</td></tr>`;
+  });
+  h += `</tbody></table></div></div>`;
+
+  h += `<div class="card"><div class="ct mb8">数据完整度</div>${repDataList(M, D)}</div>`;
+  h += `</div>`;
+
+  /* 维度导航：点着看，不用滚 */
+  h += `<div class="ch" style="margin:6px 0 10px">
+    <div class="ct">按维度深入 <span class="tagline">点任意板块进入</span></div>
+    <div class="cs">共 5 个分析维度</div></div>`;
+  h += repDimNav(M, D, s);
+
+  return h;
+}
+
+/* 数据完整度清单 */
+function repDataList(M, D){
+  const A = D.analyses.A, SRC = D.analyses.SRC, RF = D.analyses.RF;
+  const items = [
+    ['分时段记录', M.flags.hasTimeline ? (A && A.slots ? A.slots.length : 0)+' 条' : '未提供'],
+    ['商品明细', M.products.length ? M.products.length+' 款' : '未提供'],
+    ['流量来源', SRC ? SRC.list.length+' 个渠道' : '未提供'],
+    ['退款数据', RF ? '已识别' : '未提供'],
+    ['未识别字段', M.unknownFields.length ? M.unknownFields.length+' 个' : '无'],
+  ];
+  return `<div style="font-size:11.5px">
+    ${items.map(([k,v])=>{
+      const miss = v==='未提供';
+      return `<div style="display:flex;justify-content:space-between;padding:4.5px 0;border-bottom:1px dashed var(--border)">
+        <span style="color:var(--text-3)">${k}</span>
+        <b style="font-weight:600;color:${miss?'var(--text-3)':'var(--text)'}">${v}</b></div>`;
+    }).join('')}
+  </div>`;
+}
+
+/* 总览页的 5 个维度入口卡 */
+function repDimNav(M, D, s){
+  const A = D.analyses.A, PQ = D.analyses.PQ, SRC = D.analyses.SRC, RF = D.analyses.RF;
+  const B = benchOf(ST.cat);
+  const cards = [];
+
+  /* 转化漏斗 */
+  const cvrGap = (s.cvr!=null && B.cvr) ? (s.cvr-B.cvr) : null;
+  cards.push(dimCard('funnel','转化漏斗','▽',[
+    ['进入率', s.entryRate!=null?s.entryRate+'%':'—', s.entryRate!=null&&B.entryRate&&s.entryRate<B.entryRate?'var(--red)':null],
+    ['成交转化率', s.cvr!=null?s.cvr+'%':'—', cvrGap!=null&&cvrGap<0?'var(--red)':'var(--green)'],
+    ['UV 价值', s.uvValue!=null?'¥'+s.uvValue:'—', s.uvValue!=null&&B.uvValue&&s.uvValue<B.uvValue?'var(--red)':null],
+  ]));
+
+  /* 流量与时段 */
+  const peak = (A && A.slots.length) ? Math.max(...A.slots.map(x=>x.online||0)) : (s.peakOnline||null);
+  const topSrc = SRC && SRC.list.length ? SRC.list[0] : null;
+  cards.push(dimCard('traffic','流量与时段','◫',[
+    ['峰值在线', peak!=null?peak.toLocaleString():'—'],
+    ['主要来源', topSrc?topSrc.name+' '+topSrc.share.toFixed(0)+'%':'—'],
+    ['低效时段', (A&&A.wasted)?A.wasted.length+' 个':'—', (A&&A.wasted&&A.wasted.length)?'var(--red)':null],
+  ]));
+
+  /* 商品表现 */
+  const hi = PQ ? PQ.list.filter(p=>p.quadrant==='highTime').length : 0;
+  const low = PQ ? PQ.list.filter(p=>p.quadrant==='lowTime').length : 0;
+  cards.push(dimCard('product','商品表现','▦',[
+    ['上架商品', M.products.length?M.products.length+' 款':(PQ?PQ.list.length+' 款':'—')],
+    ['高效商品', hi+' 款', hi?'var(--green)':null],
+    ['待压缩商品', low+' 款', low?'var(--red)':null],
+  ]));
+
+  /* 问题诊断 */
+  const p0 = D.issues.filter(i=>i.sev==='high').length;
+  const p1 = D.issues.filter(i=>i.sev==='mid').length;
+  cards.push(dimCard('issues','问题诊断','☰',[
+    ['问题总数', D.issues.length+' 项'],
+    ['P0 严重', p0+' 项', p0?'var(--red)':null],
+    ['P1 关注', p1+' 项', p1?'var(--amber)':null],
+  ]));
+
+  /* 行动清单 */
+  const un = ST.todos.filter(t=>!t.done).length;
+  cards.push(dimCard('action','行动清单','✓',[
+    ['待办事项', ST.todos.length+' 项'],
+    ['未完成', un+' 项', un?'var(--amber)':null],
+    ['责任人', new Set(ST.todos.map(t=>t.owner)).size+' 个'],
+  ]));
+
+  /* 退款归因 */
+  if(RF){
+    cards.push(dimCard('overview','退款归因','◈',[
+      ['本场退款率', RF.rate+'%', RF.rate>RF.bench?'var(--red)':'var(--green)'],
+      ['类目基准', RF.bench+'%'],
+      ['损失 GMV', RF.lostGmv!=null?'¥'+RF.lostGmv.toLocaleString():'—'],
+    ]));
+  }
+
+  return `<div class="dims">${cards.join('')}</div>`;
+}
+
+/* ---------- 板块 2：转化漏斗 ---------- */
+function repFunnel(M, D, s){
+  const B = benchOf(ST.cat);
+  let h = `<div class="grid g21">
+    <div class="card">
+      <div class="ch"><div class="ct">转化漏斗 <span class="tagline">标出断点环节</span></div>
+        <div class="cs">数值为该环节规模</div></div>
+      ${renderFunnelHTML(M, D, B)}
+    </div>
+    <div class="card">
+      <div class="ct mb8">GMV 三因子拆解</div>
+      ${repGmvFactors(M, s, B)}
+    </div>
+  </div>`;
+
+  /* 漏斗全环节明细 */
+  const steps = repFunnelSteps(M, s, B);
+  if(steps.length){
+    h += `<div class="card mt12">
+      <div class="ch"><div class="ct">各环节 vs 基准</div>
+        <div class="cs">差距 = 本场 − 基准（pp 为百分点）</div></div>
+      <div class="tb-wrap"><table><thead><tr>
+        <th>环节</th><th class="num">本场</th><th class="num">类目基准</th><th style="text-align:right">差距</th>
+      </tr></thead><tbody>
+      ${steps.map(([n,v,b,unit])=>{
+        let gap='';
+        if(v!=null && b!=null){
+          const d = v-b;
+          const good = d>0;
+          gap = `<span class="${Math.abs(d)<0.3?'flat':(good?'down':'up')}">${d>0?'▲':'▼'}${Math.abs(d).toFixed(1)}${unit==='pp'?'pp':''}</span>`;
+        } else gap = '<span class="flat">—</span>';
+        return `<tr><td>${n}</td>
+          <td class="num" style="font-weight:600">${v==null?'—':(unit==='pp'?v+'%':v)}</td>
+          <td class="num" style="color:var(--text-3)">${b==null?'—':(unit==='pp'?b+'%':b)}</td>
+          <td style="text-align:right">${gap}</td></tr>`;
+      }).join('')}
+      </tbody></table></div>
+    </div>`;
+  }
+  return h;
+}
+
+/* GMV 三因子：曝光 × 进入率 × 转化率 × 客单价 */
+function repGmvFactors(M, s, B){
+  const rows = [
+    ['曝光人数', s.exposure, null, v=>v.toLocaleString()],
+    ['进入率', s.entryRate, B.entryRate, v=>v+'%'],
+    ['成交转化率', s.cvr, B.cvr, v=>v+'%'],
+    ['客单价', s.aov, B.aov, v=>'¥'+v],
+  ].filter(r=>r[1]!=null);
+
+  if(rows.length<2) return '<div class="empty">数据不足</div>';
+
+  let worst = null, worstGap = 0;
+  rows.forEach(([n,v,b])=>{
+    if(b==null||!b) return;
+    const g = (v-b)/b*100;
+    if(g<worstGap){ worstGap=g; worst=n; }
+  });
+
+  const advice = {
+    '进入率':'进入率低说明封面/标题或投放人群不匹配，先别急着改货——人根本没进来。',
+    '成交转化率':'转化率低是话术、价格锚点或排品顺序的问题，属于「人」的可控项。',
+    '客单价':'客单价低通常是只推了低价款，缺少中高价位的价值塑造与搭配推荐。',
+    '曝光人数':'曝光不足是流量问题，需要加大投放或优化短视频引流。',
+  }[worst];
+
+  return `<div style="font-size:11.5px">
+    <div class="note" style="font-size:11px;padding:8px 10px;margin-bottom:10px">
+      GMV ≈ 曝光人数 × 进入率 × 成交转化率 × 客单价。逐个因子对基准，就能定位是「流量问题」还是「承接问题」。
+    </div>
+    ${rows.map(([n,v,b,fmt])=>{
+      const g = (b&&b!==0) ? (v-b)/b*100 : null;
+      const bad = g!=null && g<-10;
+      return `<div style="display:flex;justify-content:space-between;align-items:baseline;
+        padding:5px 0;border-bottom:1px dashed var(--border)">
+        <span style="color:var(--text-3)">${n}</span>
+        <span><b style="font-weight:600;font-variant-numeric:tabular-nums">${fmt(v)}</b>
+        ${g!=null?`<span class="${Math.abs(g)<5?'flat':(g>0?'down':'up')}" style="font-size:10.5px;margin-left:6px">
+          ${g>0?'▲':'▼'}${Math.abs(g).toFixed(0)}%</span>`:''}</span>
+      </div>`;
+    }).join('')}
+    ${worst?`<div class="note mt12" style="font-size:11px">
+      <b>最大拖累项：${worst}</b>（低于基准 ${Math.abs(worstGap).toFixed(0)}%）。<br>${advice}
+    </div>`:`<div class="note mt12" style="font-size:11px">各因子均达标或缺少基准可比。</div>`}
+  </div>`;
+}
+
+/* 漏斗各环节数值（用于对照表） */
+function repFunnelSteps(M, s, B){
+  const out = [];
+  if(s.entryRate!=null) out.push(['进入率', s.entryRate, B.entryRate||null, 'pp']);
+  if(s.cvr!=null)       out.push(['成交转化率', s.cvr, B.cvr||null, 'pp']);
+  if(s.aov!=null)       out.push(['客单价', s.aov, B.aov||null, '']);
+  if(s.uvValue!=null)   out.push(['UV 价值', s.uvValue, B.uvValue||null, '']);
+  if(s.naturalRate!=null) out.push(['自然流量占比', s.naturalRate, B.naturalRate||null, 'pp']);
+  return out;
+}
+
+/* ---------- 板块 3：流量与时段 ---------- */
+function repTraffic(M, D, s){
+  const A = D.analyses.A, SRC = D.analyses.SRC;
+  const B = benchOf(ST.cat);
+  let h = '';
+
+  /* 流量来源 + 结构解读 */
+  h += `<div class="grid g21">
+    <div class="card">
+      <div class="ch"><div class="ct">流量来源 <span class="tagline">占比 vs 进入率</span></div>
+        <div class="cs">${SRC?SRC.list.length+' 个渠道':'—'}</div></div>
+      ${SRC ? renderSourceTable(SRC) : '<div class="empty">无流量来源数据<br><span style="font-size:11px">补充「渠道名 + 人数 + 进入率」后可生成</span></div>'}
+    </div>
+    <div class="card">
+      <div class="ct mb8">流量结构解读</div>
+      ${repSourceInsight(M, s, SRC, B)}
+    </div>
+  </div>`;
+
+  /* 时段热力 */
+  if(M.flags.hasTimeline && A){
+    h += `<div class="card mt12">
+      <div class="ch">
+        <div class="ct">时段热力 <span class="tagline">柱高=在线人数 · 颜色=成交效率</span></div>
+        <div class="cs">效率系数 = 成交占比 ÷ 流量占比</div>
+      </div>
+      ${renderHeat(A)}
+      <div class="row mt12" style="gap:16px">
+        <span class="muted"><span style="display:inline-block;width:9px;height:9px;background:var(--green);border-radius:2px;vertical-align:-1px"></span> 高效 系数&gt;1.5</span>
+        <span class="muted"><span style="display:inline-block;width:9px;height:9px;background:var(--amber);border-radius:2px;vertical-align:-1px"></span> 一般 0.6–1.5</span>
+        <span class="muted"><span style="display:inline-block;width:9px;height:9px;background:var(--red);border-radius:2px;vertical-align:-1px"></span> 低效 系数&lt;0.6</span>
+      </div>
+    </div>`;
+
+    /* 高效 / 低效时段排名 */
+    h += `<div class="grid g2 mt12">
+      <div class="card">
+        <div class="ch"><div class="ct">最高效时段 <span class="tagline">加预算</span></div></div>
+        ${repSlotRank(A, 'best')}
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">最低效时段 <span class="tagline">压缩或换品</span></div></div>
+        ${repSlotRank(A, 'worst')}
+      </div>
+    </div>`;
+
+    /* 走势折线 */
+    h += `<div class="card mt12">
+      <div class="ch"><div class="ct">流量与成交走势 <span class="tagline">自动标注拐点</span></div></div>
+      <div class="lg">
+        <span><i style="background:#21578E"></i>在线人数</span>
+        <span><i style="background:#C0392B"></i>成交金额</span>
+      </div>
+      <div class="chart"><canvas id="cv"></canvas></div>
+    </div>`;
+  } else {
+    h += `<div class="warn mt12"><b>没有分时段数据</b>：时段热力、时段效率排名与拐点定位都需要按时间排列的明细（如「时间 + 在线人数 + 成交金额」）。</div>`;
+  }
+
+  return h;
+}
+
+/* 流量结构解读 */
+function repSourceInsight(M, s, SRC, B){
+  if(!SRC) return '<div class="empty">无流量来源数据</div>';
+  const paid = SRC.paid, natural = SRC.natural;
+  const other = Math.max(0, 100-paid-natural);
+  const risky = paid > 45;
+  const rows = [
+    ['付费流量', paid.toFixed(1)+'%', risky?'var(--red)':'var(--text)'],
+    ['自然/推荐', natural.toFixed(1)+'%', natural<30?'var(--amber)':'var(--green)'],
+    ['其他来源', other.toFixed(1)+'%', null],
+  ];
+  return `<div style="font-size:11.5px">
+    ${rows.map(([k,v,c])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;
+      border-bottom:1px dashed var(--border)">
+      <span style="color:var(--text-3)">${k}</span><b style="font-weight:600;color:${c||'var(--text)'}">${v}</b></div>`).join('')}
+    <div class="note mt12" style="font-size:11px">
+      ${risky
+        ? `<b>付费依赖偏高</b>：付费占比 ${paid.toFixed(0)}%，自然流量只占 ${natural.toFixed(0)}%。一旦停投，在线人数会断崖式下跌——建议先修内容承接，再逐步降投。`
+        : natural < 30
+        ? `自然流量占比 ${natural.toFixed(0)}% 偏低，长期获客成本会走高。优先优化短视频引流与开播时段。`
+        : `<b>流量结构健康</b>：付费 ${paid.toFixed(0)}% / 自然 ${natural.toFixed(0)}%，有自然流量托底，投放可以更从容。`}
+      ${SRC.list.length?`<br>最大来源是 <b>${SRC.list[0].name}</b>（${SRC.list[0].share.toFixed(0)}%），进入率 ${SRC.list[0].entry!=null?SRC.list[0].entry+'%':'未提供'}。`:''}
+    </div>
+  </div>`;
+}
+
+/* 时段效率排名 */
+function repSlotRank(A, kind){
+  const list = kind==='best'
+    ? A.slots.slice().filter(x=>x.efficiency!=null).sort((a,b)=>b.efficiency-a.efficiency).slice(0,5)
+    : A.slots.slice().filter(x=>x.efficiency!=null).sort((a,b)=>a.efficiency-b.efficiency).slice(0,5);
+  if(!list.length) return '<div class="empty">效率数据不足</div>';
+  const maxGmv = Math.max(...list.map(x=>x.gmv||0), 1);
+  return `<div style="font-size:11.5px">
+    ${list.map(x=>`<div style="display:flex;align-items:center;gap:9px;padding:4.5px 0;
+      border-bottom:1px dashed var(--border)">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--text-2);width:42px;flex-shrink:0">${x.label}</span>
+      <span style="flex:1;min-width:0;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.item||'—')}</span>
+      <span style="width:52px;flex-shrink:0;text-align:right;font-variant-numeric:tabular-nums">
+        ¥${(x.gmv||0).toLocaleString()}</span>
+      <span style="width:44px;flex-shrink:0;text-align:right;font-weight:600;
+        color:${x.efficiency>=1.5?'var(--green)':x.efficiency<0.6?'var(--red)':'var(--amber)'}">
+        ${x.efficiency.toFixed(2)}</span>
+    </div>`).join('')}
+    <div class="muted mt8" style="font-size:10.5px">系数 &gt;1.5 高效 · &lt;0.6 低效 · 末列为效率系数</div>
+  </div>`;
+}
+
+/* ---------- 板块 4：商品表现 ---------- */
+function repProduct(M, D){
+  const PQ = D.analyses.PQ;
+  let h = '';
+
+  if(!PQ || !PQ.list.length){
+    return `<div class="card"><div class="empty">无商品数据<br>
+      <span style="font-size:11px">补充「商品名称 + 转化率 + 销售额」后可生成四象限与商品诊断</span></div></div>`;
+  }
+
+  h += `<div class="grid g21">
+    <div class="card">
+      <div class="ch"><div class="ct">商品四象限 <span class="tagline">横=讲解段数 · 纵=转化率</span></div>
+        <div class="cs">${PQ.list.length} 款</div></div>
+      ${renderQuad(PQ)}
+    </div>
+    <div class="card">
+      <div class="ct mb8">商品策略建议</div>
+      ${repProductPlan(PQ)}
+    </div>
+  </div>`;
+
+  /* 明细表 */
+  h += `<div class="card mt12 pad0">
+    <div class="ch" style="padding:13px 14px 0"><div class="ct">商品明细</div>
+      <div class="cs">${M.products.length||PQ.list.length} 款 · 按销售额排序</div></div>
+    <div class="tb-wrap" style="padding:0 14px 13px"><table>
+      <thead><tr><th>商品</th><th class="num">点击率</th><th class="num">转化率</th>
+      <th class="num">讲解段数</th><th class="num">销售额</th><th style="text-align:right">判断</th></tr></thead>
+      <tbody>${PQ.list.slice().sort((a,b)=>(b.amt||0)-(a.amt||0)).map(p=>{
+        let pill='<span class="badge b-gray">—</span>';
+        if(p.cvr!=null && PQ.avgCvr!=null){
+          if(p.cvr<PQ.avgCvr*0.7) pill='<span class="badge b-red">转化偏低</span>';
+          else if(p.cvr>PQ.avgCvr*1.25) pill='<span class="badge b-green">效率高</span>';
+          else pill='<span class="badge b-amber">一般</span>';
+        }
+        return `<tr><td style="font-weight:500">${esc(p.name)}</td>
+          <td class="num">${p.ctr!=null?p.ctr+'%':'—'}</td>
+          <td class="num">${p.cvr!=null?p.cvr+'%':'—'}</td>
+          <td class="num">${p.segs!=null?p.segs+' 段':'—'}</td>
+          <td class="num">${p.amt!=null?'¥'+p.amt.toLocaleString():'—'}</td>
+          <td style="text-align:right">${pill}</td></tr>`;
+      }).join('')}</tbody></table></div>
+  </div>`;
+
+  return h;
+}
+
+/* 按四象限给具体动作 */
+function repProductPlan(PQ){
+  const g = k => PQ.list.filter(p=>p.quadrant===k);
+  const star = g('highTime');      // 讲得多 + 转化高
+  const hidden = g('highShortTime'); // 讲得少 + 转化高
+  const burn = g('lowTime');       // 讲得多 + 转化低
+  const weak = g('lowShortTime');  // 讲得少 + 转化低
+
+  const block = (title, list, color, action) => {
+    if(!list.length) return '';
+    return `<div style="margin-bottom:11px">
+      <div style="font-size:11.5px;font-weight:600;color:${color};margin-bottom:3px">
+        ${title} <span class="muted" style="font-weight:400">${list.length} 款</span></div>
+      <div style="font-size:11px;color:var(--text-2);line-height:1.6">
+        ${list.map(p=>esc(p.name)+`（转化 ${p.cvr!=null?p.cvr+'%':'—'} · ${p.segs||0} 段）`).join('、')}<br>
+        <span style="color:var(--text-3)">${action}</span></div>
+    </div>`;
+  };
+
+  let h = '';
+  h += block('明星品 · 加大', star, 'var(--green)', '讲解频次与投放预算都可以再加，这是本场的主要产出品。');
+  h += block('被埋没 · 增加曝光', hidden, 'var(--blue)', '转化高但只讲了几段——下场把它安排到流量高位时段，加大讲解次数。');
+  h += block('拖后腿 · 压缩', burn, 'var(--red)', '占用了最多讲解时间但转化最差，直接砍到 1–2 段，把时间让给明星品。');
+  h += block('低效 · 换品', weak, 'var(--amber)', '讲得少也卖不动，考虑替换或改价，不要再占排期。');
+  if(!h) h = '<div class="empty">商品数据不足以给出策略</div>';
+
+  h += `<div class="note mt8" style="font-size:10.5px">
+    本场平均转化率 ${PQ.avgCvr!=null?PQ.avgCvr+'%':'—'} · 平均讲解 ${PQ.avgSeg!=null?PQ.avgSeg+' 段':'—'}</div>`;
+  return h;
+}
+
+/* ---------- 板块 5：问题诊断 ---------- */
+function repIssues(D){
+  const byCat = {};
+  D.issues.forEach(i=>{ const c = i.category || '其他'; byCat[c] = (byCat[c]||0)+1; });
+  const sev = {high:0, mid:0, low:0};
+  D.issues.forEach(i=>{ sev[i.sev] = (sev[i.sev]||0)+1; });
+
+  let h = `<div class="grid g4">
+    <div class="kpi"><div class="kpi-l">问题总数</div>
+      <div class="kpi-v">${D.issues.length}<small> 项</small></div>
+      <div class="kpi-d"><span class="muted">健康分 ${D.score}</span></div></div>
+    <div class="kpi"><div class="kpi-l">P0 严重</div>
+      <div class="kpi-v" style="color:var(--red)">${sev.high}<small> 项</small></div>
+      <div class="kpi-d"><span class="muted">必须下场前解决</span></div></div>
+    <div class="kpi"><div class="kpi-l">P1 需关注</div>
+      <div class="kpi-v" style="color:var(--amber)">${sev.mid}<small> 项</small></div>
+      <div class="kpi-d"><span class="muted">建立检查机制</span></div></div>
+    <div class="kpi"><div class="kpi-l">涉及环节</div>
+      <div class="kpi-v">${Object.keys(byCat).length}<small> 类</small></div>
+      <div class="kpi-d"><span class="muted">${Object.entries(byCat).map(([k,v])=>k+' '+v).join(' · ')||'—'}</span></div></div>
+  </div>`;
+
+  h += `<div class="card mt12">
+    <div class="ch"><div class="ct">完整诊断 <span class="tagline">含证据链与执行方案</span></div>
+      <div class="cs">${D.issues.length} 项 · 点标题展开</div></div>
+    <div id="issList">${D.issues.map((it,i)=>renderIssueCard(it,i)).join('') || '<div class="empty">未检出问题</div>'}</div>
+  </div>`;
+
+  h += `<div class="note mt12" style="font-size:11px">
+    每条问题都给出「证据 → 归因 → 动作」三段。证据是具体数字，归因解释为什么，动作写明下场怎么改。
+    想按 P0/P1 排优先级执行，去「行动清单」板块。
+  </div>`;
+  return h;
+}
+
+/* ---------- 板块 6：行动清单 ---------- */
+function repActionSec(){
+  const todos = ST.todos;
+  const manualCnt = todos.filter(t=>t.manual).length;
+  const byOwner = {};
+  todos.forEach(t=>{ (byOwner[t.owner] = byOwner[t.owner]||[]).push(t); });
+  const doneCnt = todos.filter(t=>t.done).length;
+
+  let h = `<div class="grid g4">
+    <div class="kpi"><div class="kpi-l">待办总数</div>
+      <div class="kpi-v">${todos.length}<small> 项</small></div>
+      <div class="kpi-d"><span class="muted">${todos.length?('诊断自动 '+(todos.length-manualCnt)+' 条'+(manualCnt?(' · 手动 '+manualCnt+' 条'):'')):'来源：本场诊断'}</span></div></div>
+    <div class="kpi"><div class="kpi-l">P0 优先</div>
+      <div class="kpi-v" style="color:var(--red)">${todos.filter(t=>t.p==='P0').length}<small> 项</small></div>
+      <div class="kpi-d"><span class="muted">先做这些</span></div></div>
+    <div class="kpi"><div class="kpi-l">已完成</div>
+      <div class="kpi-v" style="color:var(--green)">${doneCnt}<small> 项</small></div></div>
+    <div class="kpi"><div class="kpi-l">完成率</div>
+      <div class="kpi-v">${todos.length?Math.round(doneCnt/todos.length*100):0}<small>%</small></div>
+      <div class="kpi-bar"><i style="width:${todos.length?doneCnt/todos.length*100:0}%;background:var(--green)"></i></div></div>
+  </div>`;
+
+  h += `<div class="grid g21 mt12">
+    <div class="card">
+      <div class="ch"><div class="ct">全部待办</div>
+        <button class="btn sm" onclick="copyTodos()">复制清单</button></div>
+      ${renderTodoList()}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="ct mb8">按责任人分组</div>
+        ${Object.entries(byOwner).map(([o,list])=>`
+          <div style="margin-bottom:11px">
+            <div style="font-size:11.5px;font-weight:600;margin-bottom:5px">
+              ${esc(o)} <span class="muted" style="font-weight:400">${list.length} 项</span></div>
+            ${list.map(t=>`<div style="font-size:11px;color:var(--text-2);padding:3px 0 3px 9px;
+              border-left:2px solid var(--border);margin-bottom:3px">${esc(t.t.slice(0,34))}${t.t.length>34?'…':''}</div>`).join('')}
+          </div>`).join('') || '<div class="empty">暂无待办</div>'}
+      </div>
+      <div class="card">
+        <div class="ct mb8">下场验证清单</div>
+        <div class="note" style="font-size:11px">
+          下场直播结束后，回看这些指标是否改善：<br><br>
+          □ 平均停留 是否回到 55 秒以上<br>
+          □ 退款率 是否降到 8% 以下<br>
+          □ 低效品讲解次数 是否已压缩<br>
+          □ UV 价值 是否回升
+        </div>
+      </div>
+    </div>
+  </div>`;
+  return h;
+}
+
+/* ---- KPI ---- */
+function kpi(label, val, raw, base, ramp, inverse){
+  let d = '';
+  if(raw!=null && base!=null){
+    const gap = (raw-base)/base*100;
+    const good = inverse ? gap<0 : gap>0;
+    const cls = Math.abs(gap)<3 ? 'flat' : (good?'down':'up');
+    d = `<span class="${cls}">${gap>0?'▲':'▼'}${Math.abs(gap).toFixed(1)}%</span>
+         <span class="muted">基准 ${base}${label.includes('率')||label.includes('占比')?'%':''}</span>`;
+  } else if(raw!=null){
+    d = `<span class="muted">基准 ${base==null?'—':base}</span>`;
+  } else {
+    d = `<span class="muted">未提供</span>`;
+  }
+  const barColor = {red:'var(--red)',blue:'var(--blue)',amber:'var(--amber)',purple:'var(--purple)'}[ramp];
+  let w = 100;
+  if(raw!=null && base!=null){
+    w = Math.min(100, Math.max(8, inverse ? (base/raw*50) : (raw/base*50)));
+  }
+  return `<div class="kpi">
+    <div class="kpi-l">${label}</div>
+    <div class="kpi-v">${val}</div>
+    <div class="kpi-d">${d}</div>
+    <div class="kpi-bar"><i style="width:${w}%;background:${barColor}"></i></div>
+  </div>`;
+}
+function fmt(v){ return v==null?'—':(typeof v==='number'?v.toLocaleString():v); }
+function shortNum(it){
+  const e = it.evidence && it.evidence[0];
+  if(!e) return '';
+  return String(e[1]).split('（')[0];
+}
+
+/* ---- 健康分环 ---- */
+function scoreRing(score){
+  const r=40, c=2*Math.PI*r;
+  const pct = Math.max(0, Math.min(100, score))/100;
+  const col = score>=85?'#276B4E':score>=70?'#21578E':score>=55?'#A8701A':'#C0392B';
+  return `<div class="score-hero">
+    <div class="ring">
+      <svg width="96" height="96" viewBox="0 0 96 96">
+        <circle cx="48" cy="48" r="${r}" fill="none" stroke="#EDEDE9" stroke-width="8"/>
+        <circle cx="48" cy="48" r="${r}" fill="none" stroke="${col}" stroke-width="8"
+          stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-pct)}"
+          transform="rotate(-90 48 48)"/>
+      </svg>
+      <div class="ring-num"><b style="color:${col}">${score}</b><span>/ 100</span></div>
+    </div>
+    <div style="font-size:11.5px;color:var(--text-2);line-height:1.7">
+      <div>评分基于 <b>${ST.DIAG.issues.length}</b> 项检出问题加权扣分</div>
+      <div class="muted mt8">P0 扣 14 · P1 扣 7 · P2 扣 3</div>
+      <div class="muted">范围 28–96，不追求满分</div>
+    </div>
+  </div>`;
+}
+
+/* ---- 漏斗 ---- */
+function renderFunnelHTML(M, D, B){
+  const s = M.session;
+  const steps = [];
+  if(s.exposure!=null) steps.push({n:'曝光',v:s.exposure,r:null,b:null,c:'#C9D6E5'});
+  if(s.views!=null){
+    const r = s.exposure ? s.views/s.exposure*100 : (s.entryRate!=null?s.entryRate:null);
+    steps.push({n:'进入直播间',v:s.views,r:r!=null?+r.toFixed(1):null,b:B.entryRate,c:'#9DB8D4'});
+  }
+  if(s.orders!=null) steps.push({n:'下单支付',v:s.orders,r:s.cvr!=null?s.cvr:null,b:B.cvr,c:'#6A8FB5'});
+  if(s.buyers!=null && s.orders && s.buyers!==s.orders)
+    steps.push({n:'成交人数',v:s.buyers,r:null,b:null,c:'#4A6E94'});
+  if(steps.length<2) return '<div class="empty">数据不足，无法绘制漏斗</div>';
+
+  let wi=-1, wg=0;
+  steps.forEach((st,i)=>{
+    if(st.r!=null && st.b){
+      const g=(st.r-st.b)/st.b;
+      if(g<wg){ wg=g; wi=i; }
+    }
+  });
+  const max = steps[0].v;
+  let h = '<div class="fun">';
+  steps.forEach((st,i)=>{
+    const w = Math.max(st.v/max*100,3);
+    const bk = i===wi;
+    let rc = '<span style="color:var(--text-3)">—</span>';
+    if(st.r!=null){
+      if(st.b){
+        const d=st.r-st.b;
+        rc=`<span class="${d<-3?'up':d>3?'down':'flat'}">${st.r}% (${d>0?'+':''}${d.toFixed(1)}pp)</span>`;
+      } else rc=`<span>${st.r}%</span>`;
+    }
+    h += `<div class="fs ${bk?'break':''}">
+      <div class="fsn">${st.n}${bk?'<span class="btag">断点</span>':''}</div>
+      <div class="fsw"><div class="fsb" style="width:${w}%;background:${st.c}"></div></div>
+      <div class="fsv">${st.v.toLocaleString()}</div>
+      <div class="fsr">${rc}</div></div>`;
+  });
+  h += '</div>';
+  if(wi>0){
+    h += `<div class="note mt12" style="font-size:11px">
+      <b>断点</b>：${steps[wi].n} 转化 ${steps[wi].r}%，基准 ${steps[wi].b}%。
+      上游漏水时优化下游等于白费，优先修这一环。</div>`;
+  }
+  return h;
+}
+
+/* ---- 时段热力 ---- */
+function renderHeat(A){
+  const slots = A.slots;
+  const maxOn = Math.max(...slots.map(s=>s.online||0), 1);
+  const effs = slots.map(s=>s.efficiency).filter(e=>e>0);
+  const maxE = effs.length ? Math.max(...effs) : 1;
+  let h = '<div class="heat">';
+  slots.forEach(s=>{
+    const hpct = (s.online||0)/maxOn;
+    const e = s.efficiency;
+    let col = 'var(--surface-3)';
+    if(e>0){
+      if(e>1.5) col='var(--green)';
+      else if(e>=0.6) col='var(--amber)';
+      else col='var(--red)';
+    }
+    h += `<div class="hbar" style="height:${Math.max(hpct*100,4)}%;background:${col}"
+      title="${s.label}｜在线 ${s.online||0}｜成交 ¥${s.gmv||0}｜效率 ${e.toFixed(2)}${s.item?'｜'+s.item:''}"></div>`;
+  });
+  h += '</div><div class="heat-x">';
+  const step = Math.max(1, Math.ceil(slots.length/8));
+  slots.forEach((s,i)=>{ h += `<span>${i%step===0?s.label:''}</span>`; });
+  h += '</div>';
+  return h;
+}
+
+/* ---- 商品四象限 ---- */
+function renderQuad(PQ){
+  const list = PQ.list.filter(p=>p.cvr!=null && p.segs!=null);
+  if(list.length<2) return '<div class="empty">商品数据不足以绘制四象限<br><span style="font-size:11px">需要「讲解段数 + 转化率」</span></div>';
+  const maxSeg = Math.max(...list.map(p=>p.segs), 1);
+  const maxCvr = Math.max(...list.map(p=>p.cvr))*1.25 || 1;
+  const avgCvr = PQ.avgCvr || 0;
+  const avgSeg = PQ.avgSeg || 0;
+
+  let h = `<div class="quad">
+    <div class="qd" style="top:-14px;left:0">高转化</div>
+    <div class="qd" style="bottom:-20px;right:0">讲解段数 →</div>
+    <div style="position:absolute;left:0;right:0;top:${(1-avgCvr/maxCvr)*100}%;
+      border-top:1px dashed var(--border-strong)"></div>
+    <div style="position:absolute;top:0;bottom:0;left:${avgSeg/maxSeg*100}%;
+      border-left:1px dashed var(--border-strong)"></div>
+    <div class="qd" style="top:4px;right:4px;color:var(--green);font-weight:600">明星品 · 加大</div>
+    <div class="qd" style="top:4px;left:4px;color:var(--amber);font-weight:600">潜力品 · 增加曝光</div>
+    <div class="qd" style="bottom:4px;left:4px;color:var(--red);font-weight:600">低效品 · 压缩</div>
+    <div class="qd" style="bottom:4px;right:4px;color:var(--text-3)">讲得多卖得动</div>`;
+  list.forEach(p=>{
+    const x = p.segs/maxSeg*100, y = (1-p.cvr/maxCvr)*100;
+    const col = p.cvr>=avgCvr ? (p.segs>=avgSeg?'#276B4E':'#B8791A') : (p.segs>=avgSeg?'#C0392B':'#8C8B85');
+    h += `<div class="qpt" style="left:${x}%;top:${y}%;width:11px;height:11px;
+      background:${col};margin-left:-5.5px;margin-top:-5.5px"
+      title="${p.name}｜${p.segs} 段讲解｜转化 ${p.cvr}%${p.amt!=null?'｜¥'+p.amt.toLocaleString():''}"></div>`;
+    h += `<div class="q-lbl" style="left:${x}%;top:${y}%;margin-top:${y<50?16:-16}px">${p.name}</div>`;
+  });
+  h += '</div>';
+  h += `<div class="note" style="font-size:11px;margin-top:6px">
+    平均转化 <b>${avgCvr.toFixed(1)}%</b> · 平均讲解 <b>${avgSeg.toFixed(1)}</b> 段。
+    <span style="color:var(--red)">左上=讲得多卖不好（压缩）</span>，
+    <span style="color:var(--green)">右上=讲得好又卖得好（主推）</span>。
+    鼠标悬停查看详情。</div>`;
+  return h;
+}
+
+/* ---- 流量来源表 ---- */
+function renderSourceTable(SRC){
+  const B = benchOf(ST.cat);
+  let h = `<div class="tb-wrap"><table><thead><tr>
+    <th>渠道</th><th class="num">占比</th><th class="num">进入率</th><th style="text-align:right">判断</th>
+  </tr></thead><tbody>`;
+  SRC.list.forEach(x=>{
+    let pill='<span class="badge b-gray">—</span>';
+    if(x.rate!=null){
+      if(x.rate < B.entryRate*0.75) pill='<span class="badge b-red">低质</span>';
+      else if(x.rate > B.entryRate*1.15) pill='<span class="badge b-green">优质</span>';
+      else pill='<span class="badge b-amber">正常</span>';
+    }
+    h += `<tr><td>${x.name}</td>
+      <td class="num">${x.share.toFixed(1)}%</td>
+      <td class="num">${x.rate!=null?x.rate+'%':'—'}</td>
+      <td style="text-align:right">${pill}</td></tr>`;
+  });
+  h += '</tbody></table></div>';
+  if(SRC.paid>0 || SRC.natural>0){
+    h += `<div class="note mt12" style="font-size:11px">
+      付费流量 <b>${SRC.paid.toFixed(1)}%</b> · 自然流量 <b>${SRC.natural.toFixed(1)}%</b>
+      ${SRC.paid>50?'（<span style="color:var(--red)">付费依赖偏高</span>，需关注自然流量承接）':''}</div>`;
+  }
+  return h;
+}
+
+/* ---- 问题卡 ---- */
+function renderIssueCard(it, i){
+  return `<div class="iss" id="iss${i}">
+    <div class="iss-h" onclick="document.getElementById('iss${i}').classList.toggle('open')">
+      <div class="dsev ${it.sev}"></div>
+      <div>
+        <div class="iss-t">${it.title}</div>
+        <div class="iss-m">
+          <span class="badge ${it.sev==='high'?'b-red':it.sev==='mid'?'b-amber':'b-blue'}">${it.sev==='high'?'P0':it.sev==='mid'?'P1':'P2'}</span>
+          &nbsp;${it.meta}
+        </div>
+      </div>
+      <div class="dnum">${shortNum(it)}</div>
+      <div class="iss-a">▶</div>
+    </div>
+    <div class="iss-b">
+      ${it.recur?`<div class="rec">◈ ${it.recur}</div>`:''}
+      <div class="sect">
+        <div class="sect-l">证据</div>
+        <div class="ev">${it.evidence.map(e=>`<div class="ev-r"><span>${e[0]}</span><b>${e[1]}</b></div>`).join('')}</div>
+      </div>
+      <div class="sect">
+        <div class="sect-l">归因分析</div>
+        <p>${it.why}</p>
+      </div>
+      ${it.plan?renderPlan(it.plan):''}
+      <div class="sect">
+        <div class="sect-l">建议动作</div>
+        <ul>${it.act.map(a=>`<li>${a}</li>`).join('')}</ul>
+      </div>
+    </div>
+  </div>`;
+}
+function renderPlan(p){
+  let h = `<div class="sect"><div class="sect-l">执行方案</div><div class="plan">
+    <div class="plan-t">${p.title}</div>`;
+  if(p.schedule){
+    h += `<table class="sched"><thead><tr>
+      <th style="width:88px">时间</th><th>商品/环节</th><th>话术要点</th><th style="width:110px">目的</th>
+    </tr></thead><tbody>`;
+    p.schedule.forEach(r=>{
+      h += `<tr><td class="stime">${r.time}</td><td style="font-weight:500">${r.item}</td>
+        <td style="color:var(--text-2)">${r.words}</td>
+        <td style="color:var(--text-3);font-size:11px">${r.goal}</td></tr>`;
+    });
+    h += '</tbody></table>';
+  }
+  if(p.steps){
+    p.steps.forEach((s,i)=>{
+      h += `<div class="step"><div class="step-n">${i+1}</div>
+        <div><span class="step-l">${s.label}</span>
+        <span class="step-d">${s.detail}</span></div></div>`;
+    });
+  }
+  if(p.template) h += `<div class="tpl">${p.template}</div>`;
+  h += '</div></div>';
+  return h;
+}
+
+/* ---- 待办 --------
+   待办有两个来源，必须分清：
+   ① 派生项：由「单场诊断」命中的问题 × 每条问题的建议动作自动生成。
+      所以一场数据如果所有规则都没命中，派生项就是 0 条 —— 这是好消息，不是功能坏了。
+   ② 手动项：在「场次对比 → 结论与决策」点「加入行动清单」加进来的决策动作。
+   勾选状态与手动项都要落盘：以前它们只活在内存里，刷新页面或切一场再回来就全没了。 */
+const TODO_KEY = 'fupantai.todos.v1';
+
+function tdBlank(){ return {ver:1, done:{}, manual:{}}; }
+function tdLoad(){
+  try{
+    const raw = localStorage.getItem(TODO_KEY);
+    const o = raw ? JSON.parse(raw) : null;
+    if(!o || typeof o!=='object') return tdBlank();
+    o.done = o.done||{}; o.manual = o.manual||{};
+    return o;
+  }catch(e){ return tdBlank(); }
+}
+function tdSave(o){
+  try{ localStorage.setItem(TODO_KEY, JSON.stringify(o)); ST.todoStoreOK = true; return true; }
+  catch(e){ ST.todoStoreOK = false; return false; }   // 隐私模式 / 配额满：本次会话仍可用，只是不留存
+}
+function tdKeyOf(sid, text){ return String(sid||'_') + '|' + String(text); }
+/* 删除场次时把它的待办记录一并清掉，否则本机存储会越积越脏 */
+function tdForget(sid){
+  const o = tdLoad();
+  const pre = String(sid||'_') + '|';
+  Object.keys(o.done).forEach(k=>{ if(k.indexOf(pre)===0) delete o.done[k]; });
+  delete o.manual[String(sid||'_')];
+  tdSave(o);
+}
+
+/* 重建当前场次的待办列表：派生项 + 手动项 + 各自的勾选状态。
+   原来所有 `ST.todos = issuesToTodos(...)` 的地方都改调它 ——
+   直接赋值会让勾选和手动项在每次「载入场次」时被冲掉。 */
+function rebuildTodos(){
+  const sid = ST.curId || '_';
+  const st = tdLoad();
+  const derived = ST.DIAG ? issuesToTodos(ST.DIAG.issues) : [];
+  derived.forEach(t=>{
+    t.done = !!st.done[tdKeyOf(sid, t.t)];
+    t.manual = false;
+  });
+  const manual = (st.manual[sid]||[]).map(t=>({
+    t: t.t, p: t.p||'P2', owner: t.owner||'运营', from: t.from||'决策动作',
+    why: t.why, target: t.target, how: t.how, done: !!t.done, manual: true,
+  }));
+  // P0 → P1 → P2；同优先级里未完成的排在前面
+  const rank = {P0:0, P1:1, P2:2};
+  ST.todos = derived.concat(manual).sort((a,b)=>
+    ((rank[a.p]!=null?rank[a.p]:9) - (rank[b.p]!=null?rank[b.p]:9)) || ((a.done?1:0) - (b.done?1:0)));
+  return ST.todos;
+}
+
+/* 当前场次的人话标签：「（2026-09-17 · 小 B）」；取不到就返回空串。
+   优先用场次记录里的值 —— ST.date / ST.hostName 在部分路径下还是空的。 */
+function tdCurLabel(){
+  let rec = null;
+  try{ rec = (typeof STORE!=='undefined' && STORE && ST.curId) ? STORE.get(ST.curId) : null; }catch(e){ rec = null; }
+  const d = (rec && rec.date) || ST.date || '';
+  const h2 = (rec && rec.hostName) || ST.hostName || '';
+  const parts = [d, h2].filter(Boolean);
+  return parts.length ? ('（' + parts.join(' · ') + '）') : '';
+}
+
+/* 待办为空时必须说清「为什么空、怎么才会有」——
+   以前只写一句「无待办项」，用户完全分不清是自己没录数据、这一场确实没问题、还是功能坏了。 */
+function todoEmptyHint(){
+  let n = 0;
+  try{ n = (typeof STORE!=='undefined' && STORE && STORE.count) ? STORE.count() : (ST.M?1:0); }
+  catch(e){ n = ST.M?1:0; }
+  if(!n){
+    return `<div class="empty">
+      <div style="font-weight:600;margin-bottom:6px">还没有待办 —— 一场数据都还没录</div>
+      <div style="line-height:1.7">行动项不是手写的，是<b>诊断自动生成</b>的：<br>
+        录入一场直播数据 → 引擎把每个指标跟基准逐条比对 → 命中的问题会拆成具体动作落到这里。</div>
+      <div style="margin-top:11px"><button class="btn sm" onclick="go('import')">去录入第一场</button></div>
+    </div>`;
+  }
+  if(ST.DIAG && (!ST.DIAG.issues || !ST.DIAG.issues.length)){
+    return `<div class="empty">
+      <div style="font-weight:600;margin-bottom:6px">这一场没有产生待办 —— 诊断没命中任何问题</div>
+            <div style="line-height:1.7">本场${esc(tdCurLabel())}的指标都落在基准区间内，
+        没有触发规则，所以没有可执行的动作。<b>这是好消息，不是数据丢了。</b><br>
+        行动项只在<b>指标明显偏离基准</b>、或出现结构性问题时才会生成。</div>
+      <div style="margin-top:11px;line-height:1.7">想核对逐条规则的判定依据 → 「单场诊断 → 问题诊断」<br>
+        想看这场的指标离基准差多少 → 「单场诊断 → 转化漏斗」</div>
+      <div style="margin-top:11px;display:flex;gap:8px">
+        <button class="btn sm" onclick="go('report');setTab('issues')">看本场问题</button>
+        <button class="btn sm" onclick="go('report');setTab('funnel')">看指标 vs 基准</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="empty">
+    <div style="font-weight:600;margin-bottom:6px">暂无待办</div>
+    <div style="line-height:1.7">先去「单场诊断」看一场的结论，诊断命中的问题会自动转成这里的待办。</div>
+    <div style="margin-top:11px"><button class="btn sm" onclick="go('report')">去看单场诊断</button></div>
+  </div>`;
+}
+
+function renderTodoList(){
+  if(!ST.todos.length) return todoEmptyHint();
+  const manualCnt = ST.todos.filter(t=>t.manual).length;
+  const doneCnt = ST.todos.filter(t=>t.done).length;
+  const src = [];
+  src.push('诊断自动 ' + (ST.todos.length - manualCnt) + ' 条');
+  if(manualCnt) src.push('决策动作 ' + manualCnt + ' 条');
+  return `<div class="note" style="font-size:11px;margin-bottom:9px">
+    ${src.join(' · ')}${doneCnt?('　已完成 '+doneCnt+' 条'):''}　勾选会存到本机，刷新和切场次都不会丢。
+  </div>` + ST.todos.map((t,i)=>`
+    <div class="td">
+      <input type="checkbox" id="td${i}" ${t.done?'checked':''} onchange="toggleTodo(${i})">
+      <label class="td-b" for="td${i}">
+        <div class="td-t">${esc(t.t)}</div>
+        <div class="td-tags">
+          <span class="tg ${String(t.p||'p2').toLowerCase()}">${t.p||'P2'}</span>
+          <span class="tg">${esc(t.owner||'运营')}</span>
+          <span class="tg">${t.from?esc(t.from):'决策动作'}</span>
+        </div>
+      </label>
+    </div>`).join('');
+}
+/* 勾选：立刻落盘 + 立刻刷新 KPI。
+   以前只改了内存里的布尔值 —— 上面的「已完成 / 完成率」纹丝不动，
+   刷新或切到别的场次再回来，勾选还全被清空。 */
+function toggleTodo(i){
+  const t = ST.todos[i];
+  if(!t) return;
+  t.done = !t.done;
+  const sid = ST.curId || '_';
+  const st = tdLoad();
+  if(t.done) st.done[tdKeyOf(sid, t.t)] = 1;
+  else delete st.done[tdKeyOf(sid, t.t)];
+  if(t.manual){
+    const arr = st.manual[sid] || [];
+    const hit = arr.filter(x=>x.t===t.t)[0];
+    if(hit){ hit.done = t.done; st.manual[sid] = arr; }
+  }
+  tdSave(st);
+  updateBadges();
+  renderView('action');     // 重渲染，让 KPI 的「已完成 / 完成率」跟着动
+  renderTopbar();
+}
+function copyTodos(){
+  if(!ST.todos.length){ alert('当前没有待办项'); return; }
+  const txt = ST.todos.map(t=>`[${t.p}][${t.owner}] ${t.t}`).join('\n');
+  navigator.clipboard.writeText(txt).then(()=>alert('已复制 ' + ST.todos.length + ' 条行动项'),
+    ()=>alert('复制失败，请手动选择'));
+}
+
+
+/* ==================== 场次库 ==================== */
+function renderLibrary(){
+  const all = STORE.all();   // 最新在前
+  let h = '';
+
+  if(!all.length){
+    document.getElementById('scroll').innerHTML = `
+      ${ST.delNote?`<div class="delbar">${ST.delNote}</div>`:''}
+      <div class="card"><div class="empty-lib">
+        <div class="big">▦</div>
+        <div style="font-size:14px;color:var(--text-2);margin-bottom:6px">场次库还是空的</div>
+        <div style="font-size:12px;line-height:1.7">每次点「开始诊断并存档」，这一场就会存进来。<br>
+        存够 2 场以上，场次对比、趋势、问题追踪才会真正有内容。</div>
+        <div class="mt12"><button class="btn pri" onclick="go('import')">去导入第一场</button></div>
+      </div></div>`;
+    return;
+  }
+
+  /* 概览 */
+  const hostCnt = new Set(all.map(x=>x.hostName)).size;
+  const scoreArr = all.map(x=>x.snapshot.score).filter(v=>v!=null);
+  const avgScore = scoreArr.length ? Math.round(scoreArr.reduce((a,b)=>a+b,0)/scoreArr.length) : 0;
+  const totalGmv = all.reduce((a,b)=>a+(b.snapshot.gmv||0),0);
+  const days = new Set(all.map(x=>x.date)).size;
+
+  h += `<div class="grid g4 mb12">
+    <div class="kpi"><div class="kpi-l">已存档场次</div><div class="kpi-v">${all.length}</div>
+      <div class="kpi-d">覆盖 ${days} 天</div></div>
+    <div class="kpi"><div class="kpi-l">累计 GMV</div><div class="kpi-v">¥${totalGmv.toLocaleString()}</div>
+      <div class="kpi-d">${all.length} 场加总</div></div>
+    <div class="kpi"><div class="kpi-l">平均健康分</div><div class="kpi-v">${avgScore}</div>
+      <div class="kpi-d">${scoreArr.length} 场有评分</div></div>
+    <div class="kpi"><div class="kpi-l">涉及主播</div><div class="kpi-v">${hostCnt}</div>
+      <div class="kpi-d">可按主播对比</div></div>
+  </div>`;
+
+  /* 数据安全面板：回答「我的数据存在哪、存住了吗、会不会丢」 */
+  let hp = null, pg = {n:all.length, days:new Set(all.map(x=>x.date)).size};
+  try{ hp = STORE.health(); }catch(e){ hp = null; }
+  try{ pg = STORE.progress() || pg; }catch(e){}
+  if(hp){
+    const theme = {
+      ok:  ['var(--green-bg)','var(--green-line)','var(--green)'],
+      warn:['var(--amber-bg)','var(--amber-line)','var(--amber)'],
+      bad: ['var(--red-bg)','var(--red-line)','var(--red)'],
+    }[hp.level] || ['var(--green-bg)','var(--green-line)','var(--green)'];
+
+    const statusTxt = hp.level==='bad'
+      ? ('保存异常：' + (hp.error || '浏览器拒绝了本次写入'))
+      : (hp.level==='warn'
+          ? ('本机存储已用 ' + hp.pct + '%，建议导出备份后清理旧场次')
+          : '数据已写入本机浏览器存储，关掉网页、重启电脑都不会丢');
+
+    // 平均每场占用 → 估算还能存多少场（给一个直观的余量概念）
+    const per = hp.count ? hp.bytes/hp.count : 0;
+    const left = per ? Math.max(0, Math.floor((hp.cap - hp.bytes)/per)) : null;
+
+    // 备份时效提醒
+    const age = exportAge();
+    let backupTxt, backupTheme;
+    if(age == null && hp.count >= 3){ backupTxt = '从未导出过备份——本机存储一旦被清理（清缓存、换设备）数据就找不回来'; backupTheme = 'var(--amber)'; }
+    else if(age == null){ backupTxt = '还没导出过备份'; backupTheme = 'var(--text-3)'; }
+    else {
+      const d = Math.floor(age/86400000);
+      backupTxt = d<=0 ? '今天导出过备份' : (d + ' 天前导出过备份');
+      backupTheme = d>=7 ? 'var(--amber)' : 'var(--text-2)';
+    }
+
+    const pctW = Math.min(100, hp.pct);
+    const barCol = hp.level==='bad' ? 'var(--red)' : (hp.level==='warn' ? 'var(--amber)' : 'var(--green)');
+    const leftTxt = left==null ? '' : ('<span>按当前每场约 ' + (per/1024).toFixed(1) + ' KB 估算，还能存约 <b>' + left.toLocaleString() + ' 场</b></span>');
+
+    h += `<div class="card mb12" style="border-color:${theme[1]};background:${theme[0]}">
+      <div class="ch" style="margin-bottom:8px">
+        <div class="ct" style="color:${theme[2]}">数据保存在哪 · 安全状态</div>
+        <div class="cs">存储介质：${hp.backend==='localStorage' ? '本机浏览器' : '内存（临时，关页面即失效）'}</div>
+      </div>
+      <div style="font-size:12px;color:${theme[2]};font-weight:600;line-height:1.6">${statusTxt}</div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:9px;font-size:11.5px;color:var(--text-2)">
+        <span>已积累 <b>${pg.n} 场</b>${pg.days>1?(' · 覆盖 <b>'+pg.days+' 天</b>'):''}</span>
+        <span>占用 <b>${(hp.bytes/1024).toFixed(1)} KB</b> / 约 ${(hp.cap/1024/1024).toFixed(0)} MB</span>
+        ${leftTxt}
+      </div>
+      <div style="height:4px;background:rgba(0,0,0,.07);border-radius:2px;overflow:hidden;margin-top:8px">
+        <i style="display:block;height:100%;width:${Math.max(pctW,1)}%;background:${barCol};border-radius:2px"></i>
+      </div>
+      <div style="margin-top:9px;font-size:11.5px;color:${backupTheme}">
+        ${backupTheme==='var(--amber)' ? '⚠ ' : ''}备份：${backupTxt}
+      </div>
+      <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm" onclick="exportLib()">导出备份（JSON）</button>
+        <button class="btn sm" onclick="document.getElementById('impFile').click()">导入备份</button>
+        <button class="btn sm" onclick="backupGuide()">检查保存状态</button>
+      </div>
+    </div>`;
+  }
+
+  /* 操作条 */
+  h += `<div class="row mb12" style="justify-content:space-between">
+    <div class="row" style="gap:8px">
+      <button class="btn pri" onclick="go('import')">＋ 导入新场次</button>
+      <button class="btn" onclick="exportLib()">导出备份</button>
+      <button class="btn" onclick="document.getElementById('impFile').click()">导入备份</button>
+      <input type="file" id="impFile" accept=".json" class="hidden" onchange="importLib(this)">
+    </div>
+    <div class="muted">共 ${all.length} 场 · 按时间倒序 · 点「诊断」可重新载入该场</div>
+  </div>`;
+
+  /* 列表 */
+  if(ST.delNote) h += `<div class="delbar">${ST.delNote}</div>`;
+  h += `<div class="card"><div class="ct mb8">场次清单</div>`;
+  h += `<div class="lib-hd"><div>日期</div><div>主播 / 备注</div>
+    <div>GMV</div><div>UV价值</div><div>停留</div><div>转化</div><div>退款</div>
+    <div>健康分</div><div>操作</div></div>`;
+  h += `<div class="lib-list">`;
+  all.forEach(x=>{
+    const sn = x.snapshot;
+    const isCur = x.id===ST.curId;
+    const sc = sn.score;
+    const scCol = sc==null ? 'var(--text-3)' : (sc>=80?'var(--green)':(sc>=60?'var(--amber)':'var(--red)'));
+    h += `<div class="lib-row ${isCur?'cur':''}">
+      <div class="lib-date">${x.date}${isCur?'<span style="color:var(--accent);font-size:9px;display:block">当前</span>':''}</div>
+      <div class="lib-host"><b>${esc(x.hostName)}</b>
+        ${x.note?`<span class="lib-note" title="${esc(x.note)}">· ${esc(x.note)}</span>`:''}
+        ${!x.note && x.category?`<span class="lib-note">· ${x.category}</span>`:''}</div>
+      <div class="lib-m" data-l="GMV">¥${fmtK(sn.gmv)}</div>
+      <div class="lib-m" data-l="UV价值">¥${(sn.uv||0).toFixed(2)}</div>
+      <div class="lib-m" data-l="停留">${sn.stay||0}s</div>
+      <div class="lib-m" data-l="转化">${(sn.cvr||0).toFixed(1)}%</div>
+      <div class="lib-m" data-l="退款" style="color:${sn.refund>12?'var(--red)':'inherit'}">${(sn.refund||0).toFixed(1)}%</div>
+      <div class="lib-sc"><span class="badge" style="background:${scCol};color:#fff;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:600">${sc==null?'—':sc}</span></div>
+      <div class="lib-act">
+        ${ST.delPending===x.id ? `
+          <button class="mini danger2" onclick="delSession('${x.id}')">确认删除</button>
+          <button class="mini" onclick="cancelDel()">取消</button>`
+        : `
+          <button class="mini" onclick="loadSession('${x.id}')">诊断</button>
+          <button class="mini" onclick="editSession('${x.id}')">改</button>
+          <button class="mini danger" onclick="delSession('${x.id}')">删</button>`}
+      </div>
+    </div>`;
+  });
+  h += `</div></div>`;
+
+  /* 关键提示 */
+  if(all.length<2){
+    h += `<div class="warn mt12">只有 1 场数据，对比和趋势还看不出来。再导入 1 场就能开始对比了。</div>`;
+  }
+
+  document.getElementById('scroll').innerHTML = h;
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtK(v){ v=v||0; return v>=10000 ? (v/10000).toFixed(1)+'万' : v.toLocaleString(); }
+
+/* 载入某一场到诊断页 */
+function loadSession(id){
+  const rec = STORE.get(id);
+  if(!rec){ alert('该场次不存在'); return; }
+  if(!rec.raw){ alert('该场次缺少原始数据，无法重新分析'); return; }
+  // 重解析，保证与当前引擎版本一致
+  const blocks = splitBlocks(rec.raw);
+  let recs=[], unk=[];
+  blocks.forEach(b=>{
+    const p = parseTable(parseDelimited(b));
+    recs = recs.concat(p.records); unk = unk.concat(p.unknown||[]);
+  });
+  const M = normalize(recs, {category:rec.category});
+  M.unknownFields = [...new Set(unk)].filter(Boolean);
+  ST.M = M; ST.DIAG = runDiagnosis(M);
+  ST.history = STORE.issueTrends();
+  ST.curId = rec.id; ST.cat = rec.category;
+  rebuildTodos();   // 必须放在 curId 之后（同上）
+
+  ST.hostName = rec.hostName; ST.date = rec.date; ST.note = rec.note;
+  ST.saveNote = null;          // 回执只属于「刚导入的那一次」，看历史场次时不该再显示
+  ST.tab.report = 'overview';
+  updateBadges();
+  go('report');
+}
+function editSession(id){
+  const rec = STORE.get(id);
+  if(!rec) return;
+  const host = prompt('主播名：', rec.hostName);
+  if(host===null) return;
+  const date = prompt('日期（YYYY-MM-DD）：', rec.date);
+  if(date===null) return;
+  const note = prompt('备注：', rec.note||'');
+  if(note===null) return;
+  STORE.update(id, {hostName:host.trim()||'未命名主播', date:date.trim()||rec.date, note:note.trim()});
+  renderLibrary();
+  updateBadges();
+  renderTopbar();
+}
+/* 删除分两步：点「删」→ 该行按钮当场变成「确认删除 / 取消」→ 再点才真删。
+   不用原生 confirm 的原因：浏览器屏蔽对话框时 confirm 静默返回 false，
+   用户看到的就是「点了删除没反应」（隐私模式、部分手机浏览器、
+   勾过「阻止此页面创建更多对话框」都会这样）。行内确认零依赖，任何环境都可靠。 */
+function delSession(id){
+  const rec = STORE.get(id);
+  if(!rec){
+    ST.delPending = null;
+    ST.delNote = '这一场已不在库里（可能刚被删掉），列表已刷新';
+    renderLibrary();
+    return;
+  }
+  if(ST.delPending !== id){        // 第一步：进入待确认，立刻给出视觉反馈
+    ST.delPending = id;
+    ST.delNote = null;
+    renderLibrary();
+    return;
+  }
+  ST.delPending = null;            // 第二步：确认删除
+  STORE.remove(id);
+  tdForget(id);            // 连同这一场的待办勾选/手动项一起清掉，避免本机存储越积越脏
+  if(ST.curId===id){ ST.curId=null; ST.M=null; ST.DIAG=null; ST.todos=[]; }
+  ST.delNote = '已删除 '+rec.date+' · '+esc(rec.hostName)+' —— 不可恢复，其他场次不受影响';
+  renderLibrary();
+  updateBadges();
+  renderTopbar();   // 顶栏「已存本机 N 场」也要跟着变，否则删空了还显示旧数字
+}
+function cancelDel(){
+  ST.delPending = null;
+  renderLibrary();
+}
+/* 备份时效：用于提醒用户「该导一次备份了」。
+   本机存储（localStorage）会被清浏览器数据、换设备、隐私模式清掉，
+   导出成文件才是真正拿得走的那份。 */
+const EXPORT_KEY = 'fupantai.lastExport';
+function markExported(){
+  try{ localStorage.setItem(EXPORT_KEY, String(Date.now())); }catch(e){}
+}
+function exportAge(){
+  try{
+    const v = localStorage.getItem(EXPORT_KEY);
+    if(!v) return null;
+    const t = +v;
+    return isFinite(t) ? (Date.now() - t) : null;
+  }catch(e){ return null; }
+}
+
+function exportLib(){
+  const data = STORE.exportJSON();
+  const blob = new Blob([data], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '复盘台_场次备份_'+todayStr()+'.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  markExported();
+}
+function importLib(input){
+  const f = input.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = e=>{
+    const r = STORE.importJSON(e.target.result);
+    if(r.ok){ alert('导入完成：新增 '+r.added+' 场，共 '+r.total+' 场'); renderLibrary(); updateBadges(); renderTopbar(); }
+    else alert('导入失败：'+r.err);
+  };
+  rd.readAsText(f);
+  input.value = '';
+}
+
+/* ==================== 场次对比（按维度分板块） ==================== */
+function renderCompare(){
+  const all = STORE.all();          // 最新在前
+  const curId = ST.curId || (all[0] && all[0].id);
+  const curRec = STORE.get(curId);
+  const others = all.filter(x=>x.id!==curId);
+
+  if(!curRec || !others.length){
+    document.getElementById('scroll').innerHTML = `
+      <div class="card"><div class="empty-lib">
+        <div class="big">⇄</div>
+        <div style="font-size:14px;color:var(--text-2);margin-bottom:6px">还没有可对比的场次</div>
+        <div style="font-size:12px;line-height:1.7">
+          对比至少需要 2 场。你已经存了 ${STORE.count()} 场。<br>
+          再导入一场，这里就能看到「本场 vs 对比场 vs 历史均值」的差异。</div>
+        <div class="mt12"><button class="btn pri" onclick="go('import')">再导入一场</button></div>
+      </div></div>`;
+    return;
+  }
+
+  // 对比对象：默认上一场
+  const prevRec = STORE.previous(curId) || others[0];
+  const cmpId = ST.compareId && STORE.get(ST.compareId) ? ST.compareId : prevRec.id;
+  const cmpRec = STORE.get(cmpId);
+
+  // 历史基准：排除本场
+  const base = STORE.baseline(curId);
+  const cur = curRec.snapshot;
+  const prev = cmpRec.snapshot;
+  const avg = k => (base && base[k]!=null) ? base[k] : 0;
+
+  const metrics = [
+    ['GMV','gmv','¥',false], ['UV价值','uv','¥',false], ['平均停留','stay','s',false],
+    ['进入率','entry','%',false], ['成交转化率','cvr','%',false],
+    ['退款率','refund','%',true], ['付费占比','paid','%',true],
+  ];
+  const nf = (k,v)=> k==='gmv' ? Math.round(v).toLocaleString() : (+v||0).toFixed(2);
+  const pfx = p => p==='s'?'':p;
+  const sfx = p => p==='s'?'s':'';
+
+  const tab = curTab('compare');
+  // 裁决板块自带对比对象选择器，独立渲染
+  if(tab==='verdict'){
+    document.getElementById('scroll').innerHTML = renderVerdict();
+    return;
+  }
+  let h = cmpPicker(curRec, cmpRec, others, cmpId, base);
+  let after = null;
+
+  if(tab==='gap'){
+    h += cmpKpi(cur, base, avg, metrics, pfx, sfx, nf);
+    h += renderCompareInsight(curRec, cmpRec, base);
+  } else if(tab==='detail'){
+    h += cmpThreeCol(cur, prev, base, cmpRec, avg, metrics, pfx, sfx, nf);
+    h += cmpAllList(all, curId);
+  } else if(tab==='trend'){
+    h += cmpTrendCard(all);
+    after = () => drawStoreTrend(curId);
+  }
+
+  document.getElementById('scroll').innerHTML = h;
+  if(after) requestAnimationFrame(after);
+}
+
+/* 对比对象切换条：各板块共用 */
+function cmpPicker(curRec, cmpRec, others, cmpId, base){
+  return `<div class="row mb12" style="justify-content:space-between">
+    <div class="pick">对比基准
+      <select onchange="switchCompare(this.value)">
+        ${others.map(x=>`<option value="${x.id}" ${x.id===cmpId?'selected':''}>${x.date} · ${esc(x.hostName)}${x.note?'（'+esc(x.note)+'）':''}</option>`).join('')}
+      </select>
+      <span class="muted">共 ${others.length} 场可选</span>
+    </div>
+    <div class="muted">本场：<b style="color:var(--text)">${curRec.date} · ${esc(curRec.hostName)}</b>　历史基准：${base.__n} 场均值</div>
+  </div>`;
+}
+
+/* 板块 1：差距概览 —— KPI 四宫格 */
+function cmpKpi(cur, base, avg, metrics, pfx, sfx, nf){
+  let h = `<div class="grid g4">`;
+  metrics.slice(0,4).forEach(([label,key,p,inv])=>{
+    const v = cur[key]||0, a = avg(key);
+    const gap = a ? (v-a)/a*100 : 0;
+    const good = inv ? gap<0 : gap>0;
+    const cls = Math.abs(gap)<3?'flat':(good?'down':'up');
+    h += `<div class="kpi">
+      <div class="kpi-l">${label} <span class="muted">vs ${base.__n} 场均值</span></div>
+      <div class="kpi-v">${pfx(p)}${key==='gmv'?Math.round(v).toLocaleString():v.toFixed(2)}${sfx(p)}</div>
+      <div class="kpi-d"><span class="${cls}">${Math.abs(gap)<3?'—':(gap>0?'▲':'▼')}${Math.abs(gap).toFixed(1)}%</span>
+        <span class="muted">均值 ${pfx(p)}${nf(key,a)}${sfx(p)}</span></div>
+    </div>`;
+  });
+  h += `</div>`;
+  return h;
+}
+
+/* 板块 2：指标明细 —— 三列对比表 + 全量场次 */
+function cmpThreeCol(cur, prev, base, cmpRec, avg, metrics, pfx, sfx, nf){
+  let h = `<div class="card">
+    <div class="ch"><div class="ct">核心指标三列对比</div>
+      <div class="cs">本场 / ${esc(cmpRec.date)} / ${base.__n} 场均</div></div>
+    <div class="tb-wrap"><table><thead><tr>
+      <th>指标</th><th class="num">本场</th><th class="num">${esc(cmpRec.date)}</th>
+      <th class="num">${base.__n} 场均</th><th style="text-align:right">vs 对比场</th>
+    </tr></thead><tbody>`;
+  metrics.forEach(([label,key,p,inv])=>{
+    const v=cur[key]||0, pv=prev[key]||0, a=avg(key);
+    const gapCmp = pv ? (v-pv)/pv*100 : 0;
+    const gapAvg = a ? (v-a)/a*100 : 0;
+    const goodC = inv?gapCmp<0:gapCmp>0;
+    const goodA = inv?gapAvg<0:gapAvg>0;
+    const clsC = Math.abs(gapCmp)<3?'flat':(goodC?'down':'up');
+    h += `<tr><td>${label}</td>
+      <td class="num" style="font-weight:600">${pfx(p)}${nf(key,v)}${sfx(p)}</td>
+      <td class="num" style="color:var(--text-2)">${pfx(p)}${nf(key,pv)}${sfx(p)}</td>
+      <td class="num" style="color:var(--text-3)">${pfx(p)}${nf(key,a)}${sfx(p)}</td>
+      <td style="text-align:right"><span class="${clsC}">${Math.abs(gapCmp)<3?'—':(gapCmp>0?'▲':'▼')}${Math.abs(gapCmp).toFixed(1)}%</span>
+        <span class="muted" style="margin-left:6px">${Math.abs(gapAvg)<3?'≈':(gapAvg>0?'+':'' )}${gapAvg.toFixed(1)}%</span></td></tr>`;
+  });
+  h += `</tbody></table></div>
+    <div class="note" style="font-size:11px;margin-top:10px">深色是「vs 对比场」，浅色是「vs 历史均值」。差值在 ±3% 以内视为持平。</div>
+  </div>`;
+  return h;
+}
+function cmpAllList(all, curId){
+  return `<div class="card mt12">
+    <div class="ch"><div class="ct">场次明细</div><div class="cs">共 ${all.length} 场，含本场</div></div>
+    <div class="tb-wrap"><table><thead><tr>
+      <th>日期</th><th>主播</th><th class="num">健康分</th><th class="num">GMV</th>
+      <th class="num">UV价值</th><th class="num">停留</th><th class="num">转化率</th><th class="num">退款率</th>
+      <th>问题</th>
+    </tr></thead><tbody>
+    ${all.map(x=>{
+      const sn=x.snapshot, isCur=x.id===curId;
+      return `<tr style="${isCur?'background:var(--blue-bg);font-weight:600':''}">
+        <td>${x.date}${isCur?'（本场）':''}</td>
+        <td style="font-weight:400">${esc(x.hostName)}</td>
+        <td class="num">${sn.score==null?'—':sn.score}</td>
+        <td class="num">¥${Math.round(sn.gmv||0).toLocaleString()}</td>
+        <td class="num">¥${(sn.uv||0).toFixed(2)}</td>
+        <td class="num">${sn.stay||0}s</td>
+        <td class="num">${(sn.cvr||0).toFixed(1)}%</td>
+        <td class="num" style="color:${sn.refund>12?'var(--red)':'inherit'};font-weight:${isCur?600:400}">${(sn.refund||0).toFixed(1)}%</td>
+        <td style="font-size:11px;color:var(--text-3)">${sn.issueCount||0} 项</td></tr>`;
+    }).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
+/* 板块 3：走势对比 */
+function cmpTrendCard(all){
+  return `<div class="card">
+    <div class="ch"><div class="ct">近 ${Math.min(all.length,12)} 场走势</div>
+      <div class="cs">本场已高亮</div></div>
+    <div class="chart" style="height:250px"><canvas id="cvTrend"></canvas></div>
+    <div class="lg mt8"><span><i style="background:#21578E"></i>GMV</span>
+      <span><i style="background:#C0392B"></i>UV价值</span>
+      <span><i style="background:#B8791A"></i>健康分</span></div>
+    <div class="note mt12" style="font-size:11px">
+      深色虚线标出的是本场位置。看走势比看单点更有意义——如果本场明显偏离自己的历史带，先查那一场发生了什么变化。
+    </div>
+  </div>`;
+}
+function switchCompare(id){ ST.compareId = id; renderCompare(); }
+
+
+
+/* 对比结论：找出本场与对比场/均值差异最大的项 */
+function renderCompareInsight(curRec, cmpRec, base){
+  const cur = curRec.snapshot, prev = cmpRec.snapshot;
+  const defs = [
+    ['GMV','gmv','%',false], ['UV价值','uv','%',false], ['平均停留','stay','%',false],
+    ['进入率','entry','%',false], ['成交转化率','cvr','%',false],
+    ['退款率','refund','pp',true], ['付费占比','paid','pp',true],
+  ];
+  const diffs = defs.map(([label,key,unit,inv])=>{
+    const v=cur[key]||0, p=prev[key]||0;
+    const d = unit==='pp' ? (v-p) : (p ? (v-p)/p*100 : 0);
+    return {label, key, unit, inv, d, v, p};
+  }).filter(x=>Math.abs(x.d)>=1)
+    .sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
+
+  let h = `<div class="note mt12"><b>对比结论</b>：本场（${curRec.date}）对比 ${cmpRec.date}，`;
+  if(!diffs.length){
+    h += `各项指标基本持平，波动在 1% 以内，说明这一场与上一场表现接近。`;
+  } else {
+    h += `差异最大的三项是 `;
+    h += diffs.slice(0,3).map(x=>{
+      const dir = x.d>0?'高':'低';
+      const good = x.inv ? x.d<0 : x.d>0;
+      const col = good?'var(--green)':'var(--red)';
+      const val = x.unit==='pp' ? Math.abs(x.d).toFixed(1)+'pp' : Math.abs(x.d).toFixed(1)+'%';
+      return `<b style="color:${col}">${x.label}${dir} ${val}</b>`;
+    }).join(' · ');
+    h += `。`;
+    // 归因建议
+    const worst = diffs.filter(x=>x.inv?x.d>0:x.d<0).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d))[0];
+    if(worst){
+      const advice = {
+        stay:'停留是转化的前置指标——停留降通常意味着开场没留人或讲品节奏拖沓。',
+        cvr:'转化率下滑多是话术、价格锚点或排品顺序的问题，不是流量问题。',
+        refund:'退款率上升要查货品描述一致性，以及发货时效。',
+        uv:'UV 价值下降说明同样流量变现更少，优先看排品与促单节奏。',
+        entry:'进入率下降通常是封面/标题或投放人群的匹配度变差。',
+        gmv:'GMV 是结果指标，要顺着停留→转化→客单这条链往下拆。',
+        paid:'付费占比升高意味着自然流量在萎缩，长期会推高获客成本。',
+      }[worst.key];
+      if(advice) h += `<br>其中 <b>${worst.label}</b> 是本场最该先查的项：${advice}`;
+      // 若历史基准也存在明显偏差，追加一句
+      const baseGap = base && base[worst.key]!=null ? (worst.v - base[worst.key]) : 0;
+      if(base && Math.abs(baseGap)>0){
+        h += `<br>同时看历史：本场 ${worst.label} ${(+worst.v).toFixed(2)}，${base.__n} 场均值 ${(+base[worst.key]).toFixed(2)}，${baseGap>0?'高于':'低于'}均值 ${Math.abs(baseGap).toFixed(2)}${worst.unit==='pp'?'pp':'%'}。`;
+      }
+    }
+  }
+  h += `</div>`;
+  return h;
+}
+
+/* ==================== 对比：结论与决策 ====================
+   这是整个网站唯一直接回答「我该优化还是继续往下走」的地方。
+   顺序刻意设计成：结论 → 依据 → 差距在哪环 → 具体动作。
+============================================================ */
+
+/* 计算本场决策（带缓存：本场/对比场/场次数变化时才重算） */
+function cmpDecide(){
+  const all = STORE.all();
+  const curId = ST.curId || (all[0] && all[0].id);
+  const curRec = STORE.get(curId);
+  if(!curRec) return null;
+  const others = all.filter(x=>x.id!==curId);
+  if(!others.length) return null;
+
+  const prevRec = STORE.previous(curId) || others[0];
+  const cmpId = (ST.compareId && ST.compareId!==curId && STORE.get(ST.compareId))
+    ? ST.compareId : prevRec.id;
+  const key = curId + '|' + cmpId + '|' + all.length;
+  if(ST._decKey === key && ST._dec) return ST._dec;
+
+  const cmpRec = STORE.get(cmpId);
+  const base = STORE.baseline(curId);
+  // 趋势序列只取「到本场为止」——看历史场次时不能拿未来的数据当依据
+  const seq = curRec.seq || 0;
+  const ordered = STORE.ordered()
+    .filter(x => (x.seq||0) <= seq)
+    .map(x => x.snapshot);
+
+  const d = decide(curRec.snapshot, cmpRec ? cmpRec.snapshot : null, base, ordered, {n:ordered.length});
+  d._cur = curRec; d._cmp = cmpRec; d._base = base; d._ordered = ordered;
+  ST._dec = d; ST._decKey = key;
+  return d;
+}
+
+/* 把「结论与决策」里的动作一键加入行动清单（落盘，切场次/刷新都还在） */
+function addDecideTodos(){
+  const d = cmpDecide();
+  if(!d){
+    // 以前这里直接 return —— 连一句提示都没有，用户点了以为按钮坏了。
+    // cmpDecide 返回 null 只有两种可能：仓库是空的，或只有一场（没有可比对象）。
+    const n = STORE.count();
+    alert(n < 2
+      ? ('「结论与决策」要先有可比的两场才能给结论 —— 目前仓库里只有 ' + n + ' 场。\n\n'
+         + '不过本场诊断已经自动生成了 ' + ST.todos.length + ' 条待办，往下看就能直接勾选。\n'
+         + '再录一场之后，这里会出现「差距在哪 · 该优化还是继续走」的裁决和对应动作。')
+      : '暂时拿不到可比数据 —— 请先到「场次库」确认至少有两场，并点开其中一场。');
+    return;
+  }
+  const sid = ST.curId || '_';
+  const st = tdLoad();
+  const arr = st.manual[sid] || [];
+  const existing = new Set((ST.todos||[]).map(t=>t.t));
+  let added = 0;
+  (d.actions||[]).forEach(a=>{
+    if(!a || existing.has(a.do)) return;
+    arr.push({t:a.do, p:a.p, owner:a.owner, from:'决策动作',
+      why:a.why, target:a.target, how:a.how, done:false});
+    existing.add(a.do);
+    added++;
+  });
+  st.manual[sid] = arr;
+  const ok = tdSave(st);
+  rebuildTodos();
+  updateBadges();
+  renderTopbar();
+  if(added){
+    alert('已加入 ' + added + ' 条到行动清单，可在「行动清单 → 待办清单」查看和勾选。'
+      + (ok ? '\n（已存到本机，刷新和切场次都不会丢）'
+            : '\n⚠ 未能存到本机（浏览器存储可能被禁用或已满），本次打开期间可用。'));
+  } else {
+    alert('这 ' + ((d.actions||[]).length) + ' 条动作已经都在行动清单里了，去「行动清单」可以直接勾选。');
+  }
+}
+
+
+/* 数值格式化：按各环的单位输出 */
+function chainVal(x){
+  if(x.v==null) return '—';
+  if(x.unit==='%') return x.v.toFixed(x.d) + '%';
+  if(x.unit==='s') return Math.round(x.v) + 's';
+  if(x.pfx) return x.pfx + (+x.v).toFixed(x.d);
+  return (+x.v).toFixed(x.d);
+}
+function chainBase(x){
+  if(x.b==null) return null;
+  if(x.unit==='%') return x.b.toFixed(x.d) + '%';
+  if(x.unit==='s') return Math.round(x.b) + 's';
+  if(x.pfx) return x.pfx + (+x.b).toFixed(x.d);
+  return (+x.b).toFixed(x.d);
+}
+
+function renderVerdict(){
+  const all = STORE.all();
+  const curId = ST.curId || (all[0] && all[0].id);
+  const curRec = STORE.get(curId);
+  const d = cmpDecide();
+
+  if(!curRec){
+    return `<div class="card"><div class="empty-lib">
+      <div class="big">★</div>
+      <div style="font-size:14px;color:var(--text-2)">还没有可判断的场次</div>
+      <div style="font-size:12px;margin-top:6px;line-height:1.7">先导入一场数据，这里才会给出结论。</div>
+      <div class="mt12"><button class="btn pri" onclick="go('import')">去导入</button></div>
+    </div></div>`;
+  }
+  const others = all.filter(x=>x.id!==curId);
+  if(!d || !others.length){
+    return `<div class="card"><div class="empty-lib">
+      <div class="big">★</div>
+      <div style="font-size:14px;color:var(--text-2)">只有 1 场，判断不了趋势</div>
+      <div style="font-size:12px;margin-top:6px;line-height:1.7">
+        这场已经记录下来了（${curRec.date}）。再导入第 2 场，这里就会给出<br>
+        「比出了什么、差距在哪、该优化还是继续往下走」。</div>
+      <div class="mt12"><button class="btn pri" onclick="go('import')">再导入一场</button></div>
+    </div></div>`;
+  }
+
+  const v = d.verdict;
+  const theme = {
+    green:{fg:'var(--green)', bg:'var(--green-bg)', line:'var(--green-line)'},
+    blue: {fg:'var(--blue)',  bg:'var(--blue-bg)',  line:'var(--blue-line)'},
+    amber:{fg:'var(--amber)', bg:'var(--amber-bg)', line:'var(--amber-line)'},
+    red:  {fg:'var(--red)',   bg:'var(--red-bg)',   line:'var(--red-line)'},
+  }[v.level] || {fg:'var(--blue)', bg:'var(--blue-bg)', line:'var(--blue-line)'};
+
+  let h = cmpPicker(curRec, d._cmp, others, d._cmp.id, d._base);
+
+  /* ---- 1. 裁决卡 ---- */
+  const slopeTxt = d.slope
+    ? (d.slope.rel >= 0 ? '↑ 每场 +' : '↓ 每场 ') + d.slope.rel + '%'
+    : '样本不足';
+  h += `<div class="vcard" style="border-color:${theme.line};background:${theme.bg}">
+    <div class="vk" style="color:${theme.fg}">本场裁决 · 已积累 ${d.sample} 场</div>
+    <div class="vh" style="color:${theme.fg}">${v.label}${v.label.length<=6?'':'：'}${v.headline}</div>
+    <div class="vr" style="color:var(--text-2)">${v.reason}</div>
+    <div class="vmeta">
+      <span>对比场：<b>${d._cmp.date} · ${esc(d._cmp.hostName)}</b></span>
+      <span>历史基准：<b>${d._base && d._base.__n ? d._base.__n + ' 场均' : '尚无'}</b></span>
+      <span>健康分走势：<b style="color:${theme.fg}">${slopeTxt}</b></span>
+      <span>硬伤：<b style="color:${d.hard.length?'var(--red)':'var(--green)'}">${d.hard.length ? d.hard.length + ' 处' : '无'}</b></span>
+    </div>
+  </div>`;
+
+  /* ---- 2. 链路拆解：差距在哪一环 ---- */
+  h += `<div class="card">
+    <div class="ch"><div class="ct">差距在哪一环 <span class="tagline">链路拆解</span></div>
+      <div class="cs">每一环对照你自己的历史均值</div></div>
+    <div class="chain">`;
+  d.chain.forEach(x=>{
+    const good = x.rank>1, bad = x.rank<0;
+    const col = bad ? (x.state==='broken'?'var(--red)':'var(--amber)') : (good?'var(--green)':'var(--text-3)');
+    const arrow = x.gap==null ? '' : (x.gap>0 ? '▲' : '▼');
+    const gapTxt = x.gap==null ? '无可比基准' : (arrow + Math.abs(x.gap).toFixed(1) + '% · ' + x.stateLabel);
+    h += `<div class="chain-i ${x.state}">
+      <div class="chain-l">${x.label}</div>
+      <div class="chain-v">${chainVal(x)}</div>
+      <div class="chain-b">${chainBase(x) ? ('均值 ' + chainBase(x)) : '无基准'}</div>
+      <div class="chain-g" style="color:${col}">${gapTxt}</div>
+    </div>`;
+  });
+  // 先把三目结果算成变量再插值 —— 模板字符串的 ${} 里直接写带引号的三目极易出错
+  const weakHint = d.weakest
+    ? '你当前最该动的是 <b style="color:var(--red)">' + d.weakest.label + '</b>（' + d.weakest.stateLabel + '）：' + d.weakest.why
+    : '各环都在正常区间，没有明显的断点。';
+  h += `</div>
+    <div class="note mt12" style="font-size:11px">
+      链路是<b>「人进得来 → 留得住 → 卖得动 → 变现多」</b>。前端断了补话术没用，后端断了加流量也白费
+      —— ${weakHint}
+    </div>
+  </div>`;
+
+  /* ---- 3. 差距明细：比出了什么 ---- */
+  h += `<div class="card mt12">
+    <div class="ch"><div class="ct">比出了什么 <span class="tagline">两个口径</span></div>
+      <div class="cs">vs 对比场 · vs ${d._base && d._base.__n ? d._base.__n + ' 场均' : '基准'}</div></div>
+    <div class="tb-wrap"><table><thead><tr>
+      <th>指标</th><th class="num">本场</th><th class="num">${esc(d._cmp.date)}</th>
+      <th class="num">vs 对比场</th><th class="num">历史均值</th><th class="num">vs 均值</th>
+    </tr></thead><tbody>`;
+
+  // 展示全部指标（不只差异大的），保证是可核对的明细
+  // 注意：解构出的位数参数不能叫 d —— 外层 d 是决策对象，同名会遮蔽掉它
+  const allDefs = [
+    ['GMV','gmv','¥',0,false], ['UV价值','uv','¥',2,false], ['平均停留','stay','',0,false],
+    ['曝光进入率','entry','%',1,false], ['成交转化率','cvr','%',1,false],
+    ['退款率','refund','%',1,true], ['付费占比','paid','%',1,true],
+  ];
+  const fmtV = (key,pfx,digits,val)=>{
+    if(val==null) return '—';
+    if(pfx==='¥') return '¥' + (key==='gmv' ? Math.round(val).toLocaleString() : (+val).toFixed(digits));
+    return (+val).toFixed(digits) + pfx;
+  };
+  allDefs.forEach(([label,key,pfx,digits,inv])=>{
+    const v0 = curRec.snapshot[key], c0 = d._cmp.snapshot[key], b0 = d._base ? d._base[key] : null;
+    const gC = pctGap(v0, c0), gB = pctGap(v0, b0);
+    const cell = (g,inverted)=>{
+      if(g==null) return '<span class="muted">—</span>';
+      const signed = inverted ? -g : g;
+      const good = signed > 0;
+      const col = Math.abs(g)<3 ? 'var(--text-3)' : (good ? 'var(--green)' : 'var(--red)');
+      const mark = Math.abs(g)<3 ? '' : (g>0 ? '▲' : '▼');
+      return `<span style="color:${col};font-weight:${Math.abs(g)>=3?600:400}">${mark}${Math.abs(g).toFixed(1)}%</span>`;
+    };
+    h += `<tr>
+      <td>${label}</td>
+      <td class="num" style="font-weight:600">${fmtV(key,pfx,digits,v0)}</td>
+      <td class="num" style="color:var(--text-2)">${fmtV(key,pfx,digits,c0)}</td>
+      <td class="num">${cell(gC,inv)}</td>
+      <td class="num" style="color:var(--text-3)">${fmtV(key,pfx,digits,b0)}</td>
+      <td class="num">${cell(gB,inv)}</td>
+    </tr>`;
+  });
+  h += `</tbody></table></div>
+    <div class="note mt12" style="font-size:11px">
+      <b>怎么读这张表</b>：先看「vs 均值」——它是你和自己常规水平的差距，比跟单场比更可信；
+      再看「vs 对比场」——它告诉你这两天之间发生了什么变化。两个口径都红，才是真问题。
+      差额在 ±3% 以内视为持平，标灰不标色。
+    </div>
+  </div>`;
+
+  /* ---- 4. 下一步动作 ---- */
+  const pTag = {P0:'b-red', P1:'b-amber', P2:'b-blue'};
+  const pDesc = {P0:'立即做', P1:'这周内', P2:'持续做'};
+  h += `<div class="card mt12">
+    <div class="ch"><div class="ct">下一步怎么做 <span class="tagline">${d.actions.length} 条</span></div>
+      <button class="btn sm" onclick="addDecideTodos()">全部加入行动清单</button></div>`;
+  d.actions.forEach(a=>{
+    h += `<div class="act ${a.p.toLowerCase()}">
+      <div class="act-h">
+        <span class="badge ${pTag[a.p]||'b-blue'}">${a.p}</span>
+        <span class="muted" style="font-size:10.5px">${pDesc[a.p]||''}</span>
+        <span class="act-do">${a.do}</span>
+        <span class="muted" style="margin-left:auto;white-space:nowrap;font-size:10.5px">责任人 ${a.owner}</span>
+      </div>
+      <div class="act-row"><b>怎么做</b>：${a.how}</div>
+      <div class="act-row"><b>目标</b>：<span style="color:${theme.fg};font-weight:600">${a.target}</span></div>
+      <div class="act-row" style="color:var(--text-3)"><b>为什么</b>：${a.why}</div>
+    </div>`;
+  });
+  h += `</div>`;
+
+  /* ---- 5. 方法说明（建立信任） ---- */
+  h += `<div class="note mt12" style="font-size:11px;background:var(--surface-2)">
+    <b>这套判断是怎么来的</b>：先看有没有硬伤（退款率 ≥15%、停留跌破均值 75%、付费占比 >55%），有就先止血；
+    没有硬伤再看健康分的走势方向；再看本场是否低于自己的基准。
+    只有在「趋势向上 + 本场不低于基准」同时成立时才会建议继续推进 ——
+    所以如果系统说「保持节奏」，不是没分析，而是分析完认为不该乱动。
+    <br>样本量：本场之前共 ${d.sample} 场${d.elasticity ? ('；停留→转化弹性实测 k='+d.elasticity.k+'（'+d.elasticity.n+' 场样本）') : '；停留→转化弹性样本还不足，收益估算按保守经验值折算'}。
+  </div>`;
+
+  return h;
+}
+
+/* 存档回执条：直接回答「我刚才这次录入，存下来了吗、算第几场」 */
+function saveNoteBar(){
+  const n = ST.saveNote;
+  if(!n) return '';
+  const map = {
+    ok: ['var(--green-bg)','var(--green-line)','var(--green)','✓'],
+    dup:['var(--blue-bg)','var(--blue-line)','var(--blue)','○'],
+    bad:['var(--red-bg)','var(--red-line)','var(--red)','!'],
+  };
+  const t = map[n.k] || map.ok;
+  const extra = n.k==='bad'
+    ? `<button class="btn sm" onclick="exportLib()" style="flex-shrink:0">立即导出备份</button>`
+    : '';
+  return `<div class="note" style="background:${t[0]};border:1px solid ${t[1]};color:${t[2]};
+    display:flex;align-items:center;gap:9px;margin-bottom:12px;font-size:11.5px">
+    <b style="color:${t[2]};font-size:12px">${t[3]}</b>
+    <span style="flex:1">${n.txt}</span>${extra}</div>`;
+}
+
+/* 诊断页顶部的裁决摘要条：导入后第一眼就能看到结论 */
+function verdictBar(){
+  const d = cmpDecide();
+  if(!d) {
+    return `<div class="warn" style="background:var(--blue-bg);color:#1A4A7A">
+      <b>这是第 1 场</b>，已经记录下来了。明天导入第 2 场之后，这里会显示两场的对比结论和「该优化还是继续往下走」。
+    </div>`;
+  }
+  const v = d.verdict;
+  const theme = {
+    green:['var(--green)','var(--green-bg)','var(--green-line)'],
+    blue: ['var(--blue)','var(--blue-bg)','var(--blue-line)'],
+    amber:['var(--amber)','var(--amber-bg)','var(--amber-line)'],
+    red:  ['var(--red)','var(--red-bg)','var(--red-line)'],
+  }[v.level] || ['var(--blue)','var(--blue-bg)','var(--blue-line)'];
+  return `<div class="vcard" style="border-color:${theme[2]};background:${theme[1]};display:flex;align-items:center;gap:14px">
+    <div style="flex:1;min-width:0">
+      <div class="vk" style="color:${theme[0]}">本场裁决 · 已积累 ${d.sample} 场</div>
+      <div style="font-size:14px;font-weight:600;color:${theme[0]};line-height:1.5;margin-top:3px">${v.label} —— ${v.headline}</div>
+      <div style="font-size:11.5px;color:var(--text-2);margin-top:5px;line-height:1.6">
+        ${d.weakest ? ('最弱一环：<b>'+d.weakest.label+'</b>（'+d.weakest.stateLabel+'）') : '链路各环都在正常区间'}
+        ${d.hard.length ? ' · <b style="color:var(--red)">'+d.hard.length+' 处硬伤</b>' : ''}
+      </div>
+    </div>
+    <button class="btn pri sm" onclick="jumpTab('compare','verdict')" style="flex-shrink:0">看完整结论</button>
+  </div>`;
+}
+/* 跨页跳转并指定维度板块 */
+function jumpTab(v, k){
+  ST.tab[v] = k;
+  go(v);
+}
+
+/* ==================== 主播对比（按维度分板块） ==================== */
+function renderHost(){
+  const list = STORE.byHost();
+  const curHost = (STORE.get(ST.curId)||{}).hostName || ST.hostName;
+
+  if(!list.length){
+    document.getElementById('scroll').innerHTML = `
+      <div class="card"><div class="empty-lib">
+        <div class="big">☺</div>
+        <div style="font-size:14px;color:var(--text-2);margin-bottom:6px">还没有主播数据</div>
+        <div style="font-size:12px;line-height:1.7">导入数据时填上主播名，这里就会自动按主播聚合对比。</div>
+        <div class="mt12"><button class="btn pri" onclick="go('import')">去导入</button></div>
+      </div></div>`;
+    return;
+  }
+  if(list.length<2){
+    document.getElementById('scroll').innerHTML = `
+      <div class="card"><div class="empty-lib">
+        <div class="big">☺</div>
+        <div style="font-size:14px;color:var(--text-2);margin-bottom:6px">目前只有 1 位主播（${esc(list[0].name)}，${list[0].sessions} 场）</div>
+        <div style="font-size:12px;line-height:1.7">
+          主播对比需要 2 位以上主播才有意义。<br>
+          导入其他主播的场次时，把主播名填成对应的人即可自动分组。</div>
+        <div class="mt12"><button class="btn pri" onclick="go('import')">再导入一位主播的场次</button></div>
+      </div></div>`;
+    return;
+  }
+
+  const enriched = list.map(x=>({...x, current: x.name===curHost}));
+  const maxUv = Math.max(...enriched.map(x=>x.uv), 0.1);
+  const best = enriched.slice().sort((a,b)=>b.uv-a.uv)[0];
+
+  const tab = curTab('host');
+  let h = '';
+  if(tab==='rank') h += hostRank(enriched, maxUv, list.length);
+  else h += hostProfile(enriched, list.length, best);
+
+  document.getElementById('scroll').innerHTML = h;
+}
+
+/* 板块 1：效率排行 */
+function hostRank(enriched, maxUv, n){
+  let h = `<div class="warn" style="background:var(--blue-bg);color:#1A4A7A">
+    <b>主播对比的作用</b>：同一货盘下不同主播的效率差异，能区分「货的问题」和「人的问题」。
+    如果换主播后转化明显变化，说明是人的问题；如果所有主播都低，说明是货或流量的问题。
+    当前已按你导入的场次自动分组，共 ${n} 位。
+  </div>`;
+
+  h += `<div class="card">
+    <div class="ch"><div class="ct">主播效率排行</div>
+      <div class="cs">UV价值 = 单流量变现能力，最能反映主播水平</div></div>
+    <div class="tb-wrap"><table><thead><tr>
+      <th>主播</th><th class="num">场次</th><th class="num">场均 GMV</th><th class="num">UV价值</th>
+      <th class="num">平均停留</th><th class="num">转化率</th><th class="num">退款率</th>
+      <th class="num">健康分</th>
+    </tr></thead><tbody>`;
+  enriched.forEach(x=>{
+    const uvBar = x.uv/maxUv*100;
+    const avgGmv = x.sessions ? x.gmv/x.sessions : 0;
+    h += `<tr ${x.current?'style="background:var(--blue-bg)"':''}>
+      <td style="font-weight:${x.current?'600':'400'}">${esc(x.name)}${x.current?' <span class="badge b-blue">当前</span>':''}</td>
+      <td class="num">${x.sessions}</td>
+      <td class="num">¥${Math.round(avgGmv).toLocaleString()}</td>
+      <td class="num"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
+        <div style="width:46px;height:4px;background:var(--surface-3);border-radius:2px;overflow:hidden">
+          <i style="display:block;height:100%;width:${uvBar}%;background:var(--blue)"></i></div>
+        <span style="font-weight:600">¥${x.uv}</span></div></td>
+      <td class="num">${x.stay}s</td>
+      <td class="num">${x.cvr}%</td>
+      <td class="num" style="color:${x.refund>7?'var(--red)':'inherit'}">${x.refund}%</td>
+      <td class="num" style="font-weight:600;color:${x.score>=85?'var(--green)':x.score>=70?'var(--blue)':'var(--amber)'}">${x.score}</td>
+    </tr>`;
+  });
+  h += `</tbody></table></div>
+    <div class="note" style="font-size:11px;margin-top:10px">
+      排序按健康分。注意看「场次」列——场次少的样本不够，单场波动可能造成误判，至少 3 场以上再下结论。
+    </div>
+  </div>`;
+
+  /* 逐项最强 */
+  const byUv = enriched.slice().sort((a,b)=>b.uv-a.uv)[0];
+  const byStay = enriched.slice().sort((a,b)=>b.stay-a.stay)[0];
+  const byCvr = enriched.slice().sort((a,b)=>b.cvr-a.cvr)[0];
+  const byRefund = enriched.slice().filter(x=>x.refund>0).sort((a,b)=>a.refund-b.refund)[0];
+  const strongest = [
+    ['UV 价值最高', byUv, '¥'+byUv.uv, '综合变现能力最强'],
+    ['停留最长', byStay, byStay.stay+'s', '话术与节奏把控最好'],
+    ['转化最高', byCvr, byCvr.cvr+'%', '逼单促单能力最强'],
+    ['退款最低', byRefund, byRefund?byRefund.refund+'%':'—', '承诺更实在，售后压力小'],
+  ].filter(x=>x[1]);
+  h += `<div class="card mt12">
+    <div class="ch"><div class="ct">分项最强 <span class="tagline">谁擅长什么</span></div></div>
+    <div class="g4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+      ${strongest.map(([label,who,val,why])=>`
+        <div style="padding:10px 11px;background:var(--surface-2);border-radius:var(--radius-sm)">
+          <div style="font-size:10.5px;color:var(--text-3);margin-bottom:4px">${label}</div>
+          <div style="font-size:13px;font-weight:600">${esc(who.name)}</div>
+          <div style="font-size:15px;font-weight:600;color:var(--blue);margin-top:2px">${val}</div>
+          <div style="font-size:10.5px;color:var(--text-3);margin-top:4px;line-height:1.5">${why}</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+  return h;
+}
+
+/* 板块 2：能力诊断 */
+function hostProfile(enriched, n, best){
+  const curRec = enriched.find(x=>x.current) || enriched[0];
+  const avgUv = enriched.reduce((a,b)=>a+b.uv,0)/enriched.length;
+  const avgStay = enriched.reduce((a,b)=>a+b.stay,0)/enriched.length;
+  const avgCvr  = enriched.reduce((a,b)=>a+b.cvr,0)/enriched.length;
+  const avgRef  = enriched.filter(x=>x.refund>0).reduce((a,b,c,arr)=>a+b.refund/arr.length,0);
+  const rank = enriched.slice().sort((a,b)=>b.uv-a.uv).findIndex(x=>x.name===curRec.name)+1;
+
+  const dims = [
+    ['UV 价值','¥'+curRec.uv, '¥'+avgUv.toFixed(1), curRec.uv-avgUv, true],
+    ['平均停留', curRec.stay+'s', avgStay.toFixed(1)+'s', curRec.stay-avgStay, true],
+    ['转化率', curRec.cvr+'%', avgCvr.toFixed(1)+'%', curRec.cvr-avgCvr, true],
+    ['退款率', curRec.refund+'%', avgRef.toFixed(1)+'%', curRec.refund-avgRef, false],
+  ];
+
+  let h = `<div class="grid g3">
+    <div class="card">
+      <div class="ch"><div class="ct">当前主播定位</div></div>
+      <div class="note" style="font-size:11.5px">
+        <b>${esc(curRec.name)}</b> 在 ${n} 位主播中 UV 价值排名 <b>第 ${rank}</b>。<br>
+        UV 价值 <b>¥${curRec.uv}</b>，主播均值 <b>¥${avgUv.toFixed(1)}</b>，
+        ${curRec.uv>avgUv?'<span style="color:var(--green)">高于均值</span>':'<span style="color:var(--red)">低于均值</span>'}。<br>
+        累计 ${curRec.sessions} 场，场均 GMV ¥${Math.round(curRec.gmv/curRec.sessions).toLocaleString()}。
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">能力对比 <span class="tagline">vs 主播均值</span></div></div>
+      ${dims.map(([label,v,a,d,big])=>{
+        const good = big ? d>0 : d<0;
+        return `<div style="display:flex;align-items:baseline;justify-content:space-between;
+          padding:4.5px 0;border-bottom:1px dashed var(--border);font-size:11.5px">
+          <span style="color:var(--text-3)">${label}</span>
+          <span><b style="font-weight:600">${v}</b>
+            <span style="color:var(--text-3);margin-left:6px">均值 ${a}</span>
+            <span class="${Math.abs(d)<1?'flat':(good?'down':'up')}" style="margin-left:6px;font-size:10.5px">
+              ${Math.abs(d)<1?'≈':(d>0?'▲':'▼')}${Math.abs(d).toFixed(1)}</span></span>
+        </div>`;
+      }).join('')}
+      <div class="muted mt8" style="font-size:10.5px;line-height:1.6">
+        UV 价值=综合变现 · 停留=节奏把控 · 转化=促单能力 · 退款=承诺是否过度
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">排班建议</div></div>
+      <div class="note" style="font-size:11.5px">
+        效率最高的 <b>${esc(best.name)}</b>（UV ¥${best.uv}）安排在流量高位时段；<br>
+        流量平稳时段安排新人练手，减少机会成本；<br>
+        大促场次必须用效率最优组合。<br><br>
+        <span style="color:var(--text-3)">判断依据：同货盘下换人后指标变化 → 是人的问题；所有人都低 → 是货或流量的问题。</span>
+      </div>
+    </div>
+  </div>`;
+
+  /* 主播 × 问题类型：谁在哪类问题上失分最多 */
+  h += `<div class="card mt12">
+    <div class="ch"><div class="ct">能力短板提示</div>
+      <div class="cs">按四项指标相对均值定位</div></div>
+    <div style="font-size:11.5px;line-height:1.75">`;
+  const weak = dims.filter(([l,v,a,d,big])=> (big? d<-1 : d>1));
+  if(weak.length){
+    h += weak.map(([label,v,a,d,big],i)=>{
+      const advice = {
+        'UV 价值':'同样流量变现更少，优先复盘排品顺序与整场的价值塑造节奏。',
+        '平均停留':'留不住人，重点看开场 10 秒的钩子和每 15 分钟的互动节点。',
+        '转化率':'人留住了但没下单，检查价格锚点是否讲清、逼单节点是否明确。',
+        '退款率':'退款偏高，可能是口播与详情页不一致，或过度承诺了发货时效。',
+      }[label];
+      return `<b>${i+1}. ${label} 弱于主播均值 ${Math.abs(d).toFixed(1)}</b><br>
+        <span style="color:var(--text-3)">${advice}</span>`;
+    }).join('<br><br>');
+  } else {
+    h += `四项指标均在主播均值附近，暂无明显短板。可以安排其带教其他主播，或增加排班场次放大产出。`;
+  }
+  h += `</div></div>`;
+  return h;
+}
+
+/* ==================== 趋势看板（按维度分板块） ==================== */
+function renderTrend(){
+  const ordered = STORE.ordered();   // 从旧到新
+  if(ordered.length<2){
+    document.getElementById('scroll').innerHTML = `
+      <div class="card"><div class="empty-lib">
+        <div class="big">↗</div>
+        <div style="font-size:14px;color:var(--text-2);margin-bottom:6px">趋势需要至少 2 场数据</div>
+        <div style="font-size:12px;line-height:1.7">当前已存 ${ordered.length} 场。多导入几场，就能看出能力是在提升还是在退步。</div>
+        <div class="mt12"><button class="btn pri" onclick="go('import')">去导入</button></div>
+      </div></div>`;
+    return;
+  }
+
+  const tab = curTab('trend');
+  let h = '';
+  let after = null;
+
+  if(tab==='chart'){
+    h += `<div class="grid g4">
+      ${trendKpi2('GMV','gmv','¥',ordered,false)}
+      ${trendKpi2('UV 价值','uv','¥',ordered,false)}
+      ${trendKpi2('平均停留','stay','s',ordered,false)}
+      ${trendKpi2('退款率','refund','%',ordered,true)}
+    </div>`;
+    h += `<div class="grid g2">
+      <div class="card"><div class="ch"><div class="ct">GMV 与 UV 价值走势</div>
+        <div class="cs">${ordered.length} 场</div></div>
+        <div class="chart" style="height:190px"><canvas id="cvGmv"></canvas></div></div>
+      <div class="card"><div class="ch"><div class="ct">停留与转化走势</div>
+        <div class="cs">停留是转化的前置指标</div></div>
+        <div class="chart" style="height:190px"><canvas id="cvStay"></canvas></div></div>
+    </div>`;
+    h += `<div class="card mt12">
+      <div class="ch"><div class="ct">健康分走势</div>
+        <div class="cs">综合评分，看整体能力趋势</div></div>
+      <div class="chart" style="height:180px"><canvas id="cvScore"></canvas></div>
+    </div>`;
+    after = () => {
+      drawMulti('cvGmv', ordered.map(x=>({date:x.date, gmv:x.snapshot.gmv, uv:x.snapshot.uv})), ['gmv','uv'], ['GMV','UV价值'], ['#21578E','#C0392B']);
+      drawMulti('cvStay', ordered.map(x=>({date:x.date, stay:x.snapshot.stay, cvr:x.snapshot.cvr})), ['stay','cvr'], ['平均停留','转化率'], ['#B8791A','#276B4E']);
+      drawMulti('cvScore', ordered.map(x=>({date:x.date, score:x.snapshot.score})), ['score'], ['健康分'], ['#6B4FA8']);
+    };
+  } else if(tab==='insight'){
+    h += renderTrendInsight(ordered);
+    h += trendCorrelation(ordered);
+  } else {
+    h += trendTable(ordered);
+  }
+
+  document.getElementById('scroll').innerHTML = h;
+  if(after) requestAnimationFrame(after);
+}
+
+/* 板块 3：指标明细表 */
+function trendTable(ordered){
+  let h = `<div class="card">
+    <div class="ch"><div class="ct">指标明细</div>
+      <div class="cs">共 ${ordered.length} 场，按时间倒序</div></div>
+    <div class="tb-wrap"><table><thead><tr>
+      <th>日期</th><th>主播</th><th class="num">健康分</th><th class="num">GMV</th><th class="num">UV价值</th>
+      <th class="num">停留</th><th class="num">进入率</th><th class="num">转化率</th><th class="num">退款率</th>
+    </tr></thead><tbody>`;
+  [...ordered].reverse().forEach(x=>{
+    const sn=x.snapshot, isCur=x.id===ST.curId;
+    h += `<tr ${isCur?'style="background:var(--blue-bg);font-weight:600"':''}>
+      <td>${x.date}${isCur?'（本场）':''}</td>
+      <td style="font-weight:400">${esc(x.hostName)}</td>
+      <td class="num">${sn.score==null?'—':sn.score}</td>
+      <td class="num">¥${Math.round(sn.gmv||0).toLocaleString()}</td>
+      <td class="num">¥${(sn.uv||0).toFixed(2)}</td>
+      <td class="num">${sn.stay||0}s</td><td class="num">${(sn.entry||0).toFixed(1)}%</td>
+      <td class="num">${(sn.cvr||0).toFixed(1)}%</td>
+      <td class="num" style="color:${sn.refund>12?'var(--red)':'inherit'}">${(sn.refund||0).toFixed(1)}%</td></tr>`;
+  });
+  h += `</tbody></table></div>
+    <div class="note" style="font-size:11px;margin-top:10px">
+      退款率超过 12% 标红。数据以你导入时的原始文本重算，引擎升级后历史场次会自动用新口径。
+    </div>
+  </div>`;
+  return h;
+}
+
+/* 真实趋势解读：用首尾斜率判断方向 */
+function renderTrendInsight(ordered){
+  const n = ordered.length;
+  const first = ordered[0].snapshot, last = ordered[n-1].snapshot;
+  const half = Math.max(1, Math.floor(n/2));
+  const avgOf = (arr,k)=>{ const v=arr.map(x=>x.snapshot[k]).filter(x=>x!=null); return v.length?v.reduce((a,b)=>a+b,0)/v.length:0; };
+  const early = ordered.slice(0,half), late = ordered.slice(-half);
+
+  const rows = [
+    ['健康分','score','',false],
+    ['GMV','gmv','¥',false],
+    ['UV价值','uv','¥',false],
+    ['平均停留','stay','s',false],
+    ['转化率','cvr','%',false],
+    ['退款率','refund','%',true],
+  ].map(([label,key,p,inv])=>{
+    const a = avgOf(early,key), b = avgOf(late,key);
+    const d = a ? (b-a)/a*100 : 0;
+    const good = inv ? d<0 : d>0;
+    return {label,key,p,inv,d,a,b,good};
+  });
+  const ups = rows.filter(r=>r.d>2 && r.good);
+  const downs = rows.filter(r=>r.d<-2 && !r.good);
+
+  let h = `<div class="note"><b>趋势解读</b>：把 ${n} 场按前后两半对比，`;
+  h += `提升最明显的是 `;
+  if(ups.length){
+    h += ups.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,3)
+      .map(r=>`<b style="color:var(--green)">${r.label} +${Math.abs(r.d).toFixed(0)}%</b>`).join('、');
+  } else h += `<span class="muted">无明显提升项</span>`;
+  h += `；`;
+  h += `需要警惕的是 `;
+  if(downs.length){
+    h += downs.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,3)
+      .map(r=>`<b style="color:var(--red)">${r.label} ${r.d>0?'+':''}${r.d.toFixed(0)}%</b>`).join('、');
+  } else h += `<span class="muted">无明显恶化项</span>`;
+  h += `。`;
+
+  // 健康分方向
+  if(first.score!=null && last.score!=null){
+    const ds = last.score-first.score;
+    h += `<br>最新一场健康分 <b>${last.score}</b>，`;
+    h += Math.abs(ds)<3 ? `与首场基本持平，能力稳定。`
+      : (ds>0 ? `<span style="color:var(--green)">比首场高 ${ds} 分，整体在进步</span>。`
+              : `<span style="color:var(--red)">比首场低 ${Math.abs(ds)} 分，需要复盘近期改动</span>。`);
+  }
+  h += `</div>`;
+
+  /* 前后两半逐项对照表 */
+  h += `<div class="card mt12">
+    <div class="ch"><div class="ct">前后两半对照</div>
+      <div class="cs">前 ${half} 场 vs 后 ${half} 场均值</div></div>
+    <div class="tb-wrap"><table><thead><tr>
+      <th>指标</th><th class="num">前半段</th><th class="num">后半段</th><th style="text-align:right">变化</th>
+    </tr></thead><tbody>
+    ${rows.map(r=>{
+      const good = r.inv ? r.d<0 : r.d>0;
+      const cls = Math.abs(r.d)<2 ? 'flat' : (good?'down':'up');
+      const fmt = v => r.key==='gmv' ? '¥'+Math.round(v).toLocaleString()
+        : (r.key==='score' ? v.toFixed(0) : (+v).toFixed(1));
+      return `<tr><td>${r.label}</td>
+        <td class="num" style="color:var(--text-2)">${fmt(r.a)}</td>
+        <td class="num" style="font-weight:600">${fmt(r.b)}</td>
+        <td style="text-align:right"><span class="${cls}">${Math.abs(r.d)<2?'—':(r.d>0?'▲':'▼')}${Math.abs(r.d).toFixed(1)}%</span></td></tr>`;
+    }).join('')}
+    </tbody></table></div>
+    <div class="note" style="font-size:11px;margin-top:10px">
+      看前后两半的对比，比看「最新一场 vs 上一场」更稳——单场波动容易被偶然因素干扰。
+    </div>
+  </div>`;
+  return h;
+}
+
+/* 指标相关性：找出哪两个指标真正同向变动 */
+function trendCorrelation(ordered){
+  const pairs = [
+    ['平均停留','转化率','stay','cvr','停留留住了人，转化才可能上来'],
+    ['平均停留','UV价值','stay','uv','停留通过率影响单位流量产出'],
+    ['进入率','平均停留','entry','stay','进得来的人对，停留才有基础'],
+    ['付费占比','UV价值','paid','uv','付费流量是否比自然流量更划算'],
+  ];
+  const res = pairs.map(([ln,rn,lk,rk,why])=>{
+    const arr = ordered
+      .map(x=>[x.snapshot[lk], x.snapshot[rk]])
+      .filter(([a,b])=>a!=null&&b!=null&&a!==0&&b!==0);
+    if(arr.length<4) return {ln,rn,r:null,n:arr.length,why};
+    const mx = arr.reduce((a,b)=>a+b[0],0)/arr.length;
+    const my = arr.reduce((a,b)=>a+b[1],0)/arr.length;
+    let num=0,dx=0,dy=0;
+    arr.forEach(([x,y])=>{ num+=(x-mx)*(y-my); dx+=(x-mx)**2; dy+=(y-my)**2; });
+    const r = (dx&&dy) ? num/Math.sqrt(dx*dy) : 0;
+    return {ln,rn,r,n:arr.length,why};
+  });
+  const valid = res.filter(x=>x.r!=null);
+
+  const head = `<div class="ch"><div class="ct">指标相关性 <span class="tagline">谁在带动谁</span></div>
+    <div class="cs">基于你 ${ordered.length} 场真实数据</div></div>`;
+
+  if(!valid.length){
+    return `<div class="card mt12">${head}
+      <div class="empty">样本不足<br><span style="font-size:11px">至少需要 4 场同时含这两项指标的数据</span></div>
+    </div>`;
+  }
+
+  let h = `<div class="card mt12">${head}`;
+  h += `<div class="tb-wrap"><table><thead><tr>
+    <th>指标组合</th><th class="num">相关系数</th><th>关系</th><th>解读</th>
+  </tr></thead><tbody>`;
+  valid.forEach(x=>{
+    const a = Math.abs(x.r);
+    const strength = a>=0.7?'强':(a>=0.4?'中等':'弱');
+    const dir = x.r>0?'正':'负';
+    const col = a<0.4 ? 'var(--text-3)' : (x.r>0?'var(--green)':'var(--red)');
+    h += `<tr>
+      <td>${x.ln} ↔ ${x.rn}</td>
+      <td class="num" style="font-weight:600;color:${col}">${x.r.toFixed(2)}</td>
+      <td><span class="badge ${a<0.4?'b-gray':(x.r>0?'b-green':'b-red')}">${strength}${dir}相关</span></td>
+      <td style="font-size:11px;color:var(--text-2)">${x.why}</td></tr>`;
+  });
+  h += `</tbody></table></div>`;
+
+  const strong = valid.filter(x=>Math.abs(x.r)>=0.6);
+  h += `<div class="note" style="font-size:11px;margin-top:11px">`;
+  if(strong.length){
+    const s0 = strong.sort((a,b)=>Math.abs(b.r)-Math.abs(a.r))[0];
+    h += `<b>你的数据里最强的关联是「${s0.ln} ↔ ${s0.rn}」（${s0.r.toFixed(2)}）</b>。` +
+      (s0.r>0
+        ? `这意味着抓${s0.ln}能带动${s0.rn}——把${s0.ln}当成本周的核心改善指标，比直接盯 GMV 更有效。`
+        : `两者反向变动，通常意味着用促销/秒杀硬拉一个指标时牺牲了另一个，需要复核节奏。`);
+  } else {
+    h += `目前各项指标之间没有明显强相关（都低于 0.6），说明你的表现波动更多来自外部因素（流量结构、排品、时段）而不是单一可控指标。建议把场次样本积累到 8 场以上再看相关性。`;
+  }
+  h += `</div></div>`;
+  return h;
+}
+
+function trendKpi2(label,key,p,ordered,inv){
+  const n = ordered.length;
+  const v = ordered[n-1].snapshot[key]||0;
+  const prevV = ordered[n-2] ? (ordered[n-2].snapshot[key]||0) : null;
+  const gap = prevV ? (v-prevV)/prevV*100 : 0;
+  const good = inv?gap<0:gap>0;
+  const cls = Math.abs(gap)<2?'flat':(good?'down':'up');
+  const vals = ordered.map(x=>x.snapshot[key]||0);
+  const mx = Math.max(...vals), mn = Math.min(...vals);
+  const show = val => key==='gmv' ? Math.round(val).toLocaleString() : val.toFixed(2);
+  return `<div class="kpi">
+    <div class="kpi-l">${label} <span class="muted">近 ${n} 场</span></div>
+    <div class="kpi-v">${p}${show(v)}</div>
+    <div class="kpi-d">${prevV!=null?`<span class="${cls}">${Math.abs(gap)<2?'—':(gap>0?'▲':'▼')}${Math.abs(gap).toFixed(1)}%</span><span class="muted">环比上场</span>`:'<span class="muted">首场</span>'}</div>
+    <div class="muted" style="margin-top:5px;font-size:10px">区间 ${p}${show(mn)} – ${p}${show(mx)}</div>
+  </div>`;
+}
+
+/* ==================== 问题库（按维度分板块） ==================== */
+function renderIssues(){
+  const total = STORE.count();
+  if(total<2){
+    document.getElementById('scroll').innerHTML = `
+      <div class="card"><div class="empty-lib">
+        <div class="big">☰</div>
+        <div style="font-size:14px;color:var(--text-2);margin-bottom:6px">问题库需要多场数据才能追踪</div>
+        <div style="font-size:12px;line-height:1.7">
+          单场只能看出「这场有什么问题」。存够 2 场以上，才能判断哪些问题是反复出现的结构性问题。<br>
+          当前已存 ${total} 场。</div>
+        <div class="mt12"><button class="btn pri" onclick="go('import')">去导入</button></div>
+      </div></div>`;
+    return;
+  }
+
+  const trends = STORE.issueTrends();
+  const chronic = trends.filter(x=>x.level==='chronic');
+  const recurring = trends.filter(x=>x.level==='recurring' || x.level==='occasional');
+  const fresh = trends.filter(x=>x.level==='new');
+
+  const tab = curTab('issues');
+  let h = '';
+  if(tab==='track') h += issTrack(trends, chronic, recurring, fresh, total);
+  else h += issPlan(trends, chronic, recurring, total);
+
+  document.getElementById('scroll').innerHTML = h;
+}
+
+/* 问题标题 → 建议验证指标 */
+function issVerify(title){
+  const rules = [
+    [/停留/, '平均停留时长是否回到类目基准以上'],
+    [/退款/, '退款率是否降到基准以内'],
+    [/转化|成交/, '成交转化率是否回到基准以上'],
+    [/时段|洼地/, '低效时段数量是否减少'],
+    [/品|讲解|排品/, '低效品讲解段数是否压缩'],
+    [/付费/, '付费流量占比是否下降'],
+    [/UV/, 'UV 价值是否回升'],
+    [/流量来源|来源/, '自然流量占比是否提升'],
+  ];
+  for(const [re, v] of rules){ if(re.test(title)) return v; }
+  return '下场的健康分是否回升';
+}
+const ISSUE_OWNER = {人:'主播', 货:'货盘', 场:'中控', 流量:'投流'};
+
+/* 板块 1：问题追踪 */
+function issTrack(trends, chronic, recurring, fresh, total){
+  let h = `<div class="warn" style="background:var(--purple-bg);color:#4A3578">
+    <b>问题库的价值</b>：单场数据只能告诉你「这场发生了什么」，跨场追踪才能告诉你
+    「哪些问题是反复出现、需要系统性解决的」。下面这些全部来自你导入的 <b>${total} 场</b>真实数据。
+  </div>`;
+
+  h += `<div class="grid g4">
+    <div class="kpi"><div class="kpi-l">结构性问题</div>
+      <div class="kpi-v" style="color:var(--red)">${chronic.length}<small> 项</small></div>
+      <div class="kpi-d"><span class="muted">连续 3 场以上出现</span></div></div>
+    <div class="kpi"><div class="kpi-l">反复 / 间歇</div>
+      <div class="kpi-v" style="color:var(--amber)">${recurring.length}<small> 项</small></div>
+      <div class="kpi-d"><span class="muted">${total} 场中出现 2 次以上</span></div></div>
+    <div class="kpi"><div class="kpi-l">首次出现</div>
+      <div class="kpi-v" style="color:var(--blue)">${fresh.length}<small> 项</small></div>
+      <div class="kpi-d"><span class="muted">下场观察是否复现</span></div></div>
+    <div class="kpi"><div class="kpi-l">本场检出</div>
+      <div class="kpi-v">${ST.DIAG?ST.DIAG.issues.length:0}<small> 项</small></div>
+      <div class="kpi-d"><span class="muted">${ST.DIAG?'健康分 '+ST.DIAG.score:'未载入'}</span></div></div>
+  </div>`;
+
+  h += `<div class="card mt12">
+    <div class="ch"><div class="ct">问题追踪</div>
+      <div class="cs">按「连续出现场次」排序，越靠前越该优先解决</div></div>`;
+  const lvCol = {chronic:'var(--red)', recurring:'var(--amber)', occasional:'var(--amber)', 'new':'var(--blue)'};
+  const lvBadge = {chronic:'b-red', recurring:'b-amber', occasional:'b-amber', 'new':'b-blue'};
+  trends.forEach(x=>{
+    const pct = total ? x.hits/total*100 : 0;
+    const detail = x.level==='chronic'
+      ? `该问题已连续 ${x.streak} 场出现，属于结构性问题，不是单场偶然。建议列入本周重点整改项，指定责任人跟踪。`
+      : x.level==='recurring'
+      ? `在 ${total} 场中出现 ${x.hits} 次，属于反复性问题。建议建立开播前检查机制，逐项确认。`
+      : x.level==='occasional'
+      ? `间歇性出现（${x.hits}/${total} 场），与单场排品或状态波动相关，需要留意但不紧急。`
+      : `本场首次明显出现，建议下场重点观察是否复现，避免演变成长期问题。`;
+    h += `<div class="diag" style="align-items:center">
+      <div class="dsev ${x.level==='chronic'?'high':x.level==='new'?'low':'mid'}"></div>
+      <div class="dbody">
+        <div class="dtxt">${esc(x.title)}</div>
+        <div class="dmeta">
+          <span class="badge ${lvBadge[x.level]}">${x.label}</span>
+          ${x.category?`<span>${esc(x.category)}</span>`:''}
+          <span>${x.hits}/${total} 场命中</span>
+          <span>首次 ${x.firstDate} · 最近 ${x.lastDate}</span>
+        </div>
+        <div style="font-size:11.5px;color:var(--text-2);margin-top:5px;line-height:1.55">${detail}</div>
+      </div>
+      <div style="width:96px;flex-shrink:0">
+        <div style="height:5px;background:var(--surface-3);border-radius:3px;overflow:hidden">
+          <i style="display:block;height:100%;width:${pct}%;background:${lvCol[x.level]}"></i>
+        </div>
+        <div class="muted" style="text-align:right;margin-top:3px;font-size:10px">${pct.toFixed(0)}% 场次命中</div>
+      </div>
+    </div>`;
+  });
+  h += `</div>`;
+  return h;
+}
+
+/* 板块 2：整改建议 */
+function issPlan(trends, chronic, recurring, total){
+  const focus = chronic.length ? chronic : recurring.slice(0,3);
+
+  let h = '';
+  if(focus.length){
+    h += `<div class="card">
+      <div class="ch"><div class="ct">整改台账 <span class="tagline">问题 → 责任人 → 验证指标</span></div>
+        <div class="cs">优先处理连续出现的问题</div></div>
+      <div class="tb-wrap"><table><thead><tr>
+        <th>问题</th><th>等级</th><th class="num">命中</th>
+        <th>建议责任人</th><th>下场验证什么</th>
+      </tr></thead><tbody>
+      ${focus.map(x=>`<tr>
+        <td style="font-weight:500">${esc(x.title)}</td>
+        <td><span class="badge ${x.level==='chronic'?'b-red':'b-amber'}">${x.level==='chronic'?'结构性':'反复'}</span></td>
+        <td class="num">${x.level==='chronic'?x.streak+' 连场':x.hits+'/'+total}</td>
+        <td>${ISSUE_OWNER[x.category]||'运营'}</td>
+        <td style="font-size:11px;color:var(--text-2)">${issVerify(x.title)}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>`;
+  }
+
+  h += `<div class="grid g2 mt12">
+    <div class="card">
+      <div class="ct mb8">本周重点整改</div>
+      <div class="note" style="font-size:11.5px">
+        ${chronic.map((x,i)=>`<b>${i+1}. ${esc(x.title)}</b>（连续 ${x.streak} 场）<br>
+          <span style="color:var(--text-3)">责任人：${ISSUE_OWNER[x.category]||'运营'} · 目标：${issVerify(x.title)}</span>`).join('<br><br>')
+          || (recurring.length
+              ? recurring.slice(0,3).map((x,i)=>`<b>${i+1}. ${esc(x.title)}</b>（${x.hits} 场出现）<br>
+                <span style="color:var(--text-3)">尚属反复问题，先建立开播前检查机制</span>`).join('<br><br>')
+              : '暂无需重点整改的结构性问题，保持观察。')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="ct mb8">开播前检查清单</div>
+      <div class="note" style="font-size:11.5px">
+        基于你历史出现的问题生成，每次开播前逐项确认：<br><br>
+        ${(()=>{
+          const items = [];
+          const has = kw => trends.some(x=>x.title.includes(kw) || (x.key&&x.key.includes(kw)));
+          if(has('停留'))   items.push('开场前 10 分钟排期已确认（福利款 + 价格锚点）');
+          if(has('退款'))   items.push('小黄车价格与口播价格已核对一致；客服退款标签已准备');
+          if(has('转化')||has('成交')) items.push('主推款话术与逼单节点已过一遍');
+          if(has('时段')||has('洼地')) items.push('千川计划已按流量结构配置，洼地时段已调整预算');
+          if(has('品')||has('讲解'))   items.push('低效品讲解次数已压缩');
+          if(!items.length) items.push('开场排期已确认','货盘价格已核对','投放计划已检查');
+          return items.map(t=>'□ '+t).join('<br>');
+        })()}
+      </div>
+    </div>
+  </div>`;
+
+  return h;
+}
+
+/* ==================== 行动清单（按维度分板块） ==================== */
+function renderAction(){
+  const todos = ST.todos;
+  const byOwner = {};
+  todos.forEach(t=>{ (byOwner[t.owner] = byOwner[t.owner]||[]).push(t); });
+  const doneCnt = todos.filter(t=>t.done).length;
+  const manualCnt = todos.filter(t=>t.manual).length;
+
+  const tab = curTab('action');
+  let h = `<div class="grid g4">
+    <div class="kpi"><div class="kpi-l">待办总数</div>
+      <div class="kpi-v">${todos.length}<small> 项</small></div>
+      <div class="kpi-d"><span class="muted">${todos.length?('诊断自动 '+(todos.length-manualCnt)+' 条'+(manualCnt?(' · 手动 '+manualCnt+' 条'):'')):'来源：本场诊断'}</span></div></div>
+    <div class="kpi"><div class="kpi-l">P0 优先</div>
+      <div class="kpi-v" style="color:var(--red)">${todos.filter(t=>t.p==='P0').length}<small> 项</small></div>
+      <div class="kpi-d"><span class="muted">下场前必须完成</span></div></div>
+    <div class="kpi"><div class="kpi-l">已完成</div>
+      <div class="kpi-v" style="color:var(--green)">${doneCnt}<small> 项</small></div></div>
+    <div class="kpi"><div class="kpi-l">完成率</div>
+      <div class="kpi-v">${todos.length?Math.round(doneCnt/todos.length*100):0}<small>%</small></div>
+      <div class="kpi-bar"><i style="width:${todos.length?doneCnt/todos.length*100:0}%;background:var(--green)"></i></div></div>
+  </div>`;
+
+  if(tab==='todo'){
+    h += `<div class="card mt12">
+      <div class="ch"><div class="ct">全部待办</div>
+        <button class="btn sm" onclick="copyTodos()">复制清单</button></div>
+      ${renderTodoList()}
+    </div>`;
+  } else {
+    h += `<div class="grid g21 mt12">
+      <div class="card">
+        <div class="ch"><div class="ct">按优先级执行顺序</div>
+          <div class="cs">P0 先清零，再做 P1</div></div>
+        ${['P0','P1','P2'].map(p=>{
+          const list = todos.filter(t=>t.p===p);
+          if(!list.length) return '';
+          const col = p==='P0'?'var(--red)':p==='P1'?'var(--amber)':'var(--blue)';
+          return `<div style="margin-bottom:13px">
+            <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+              <span class="badge" style="background:${col};color:#fff">${p}</span>
+              <span class="muted" style="font-size:11px">${list.length} 项 · ${list.filter(t=>t.done).length} 项已完成</span>
+            </div>
+            ${list.map(t=>`<div style="font-size:11.5px;color:var(--text-2);padding:4px 0 4px 10px;
+              border-left:2px solid ${col};margin-bottom:4px;line-height:1.55">
+              ${t.done?'<s style="opacity:.5">':'<b style="font-weight:500">'}
+              ${esc(t.t)}${t.done?'</s>':'</b>'}
+              <span class="muted" style="font-size:10.5px;margin-left:5px">${t.owner}</span></div>`).join('')}
+          </div>`;
+        }).join('') || '<div class="empty">暂无待办</div>'}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card">
+          <div class="ct mb8">按责任人分组</div>
+          ${Object.entries(byOwner).map(([o,list])=>`
+            <div style="margin-bottom:11px">
+              <div style="font-size:11.5px;font-weight:600;margin-bottom:5px">
+                ${esc(o)} <span class="muted" style="font-weight:400">${list.length} 项</span></div>
+              ${list.map(t=>`<div style="font-size:11px;color:var(--text-2);padding:3px 0 3px 9px;
+                border-left:2px solid var(--border);margin-bottom:3px">${esc(t.t.slice(0,34))}${t.t.length>34?'…':''}</div>`).join('')}
+            </div>`).join('') || '<div class="empty">暂无待办</div>'}
+        </div>
+        <div class="card">
+          <div class="ct mb8">下场验证清单</div>
+          <div class="note" style="font-size:11px">
+            下场直播结束后，回看这些指标是否改善：<br><br>
+            □ 平均停留 是否回到 55 秒以上<br>
+            □ 退款率 是否降到 8% 以下<br>
+            □ 低效品讲解次数 是否已压缩<br>
+            □ UV 价值 是否回升
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('scroll').innerHTML = h;
+}
+
+/* ==================== 图表 ==================== */
+function setupCanvas(cv, H){
+  const box = cv.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  const W = box.clientWidth || 600;
+  cv.width = W*dpr; cv.height = H*dpr;
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  return {ctx, W, H};
+}
+
+function drawChart(M){
+  const cv = document.getElementById('cv'); if(!cv) return;
+  const H = 170;
+  const {ctx, W} = setupCanvas(cv, H);
+  const d = M.timeline;
+  const pad = {l:50,r:14,t:16,b:24};
+  const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
+  const maxOn = Math.max(...d.map(p=>p.online||0),1)*1.15;
+  const maxG = Math.max(...d.map(p=>p.gmv||0),1)*1.3;
+
+  ctx.strokeStyle='#EDEDE9'; ctx.lineWidth=1;
+  ctx.font='10px -apple-system,sans-serif'; ctx.fillStyle='#8C8B85';
+  for(let i=0;i<=4;i++){
+    const y=pad.t+ch*i/4;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y); ctx.stroke();
+    ctx.textAlign='right'; ctx.fillText(kfmt(maxOn*(4-i)/4), pad.l-6, y+3);
+  }
+  const X=i=>pad.l+(d.length>1?cw*i/(d.length-1):cw/2);
+  const Yon=v=>pad.t+ch*(1-v/maxOn);
+
+  const bw=Math.max(cw/d.length*0.5,2);
+  d.forEach((p,i)=>{
+    if(!p.gmv) return;
+    const x=X(i)-bw/2, y=pad.t+ch*(1-p.gmv/maxG);
+    ctx.fillStyle='rgba(192,57,43,0.45)';
+    ctx.fillRect(x,y,bw,pad.t+ch-y);
+  });
+
+  ctx.beginPath(); ctx.strokeStyle='#21578E'; ctx.lineWidth=2;
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  d.forEach((p,i)=>{ const x=X(i),y=Yon(p.online||0); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.stroke();
+  ctx.lineTo(X(d.length-1),pad.t+ch); ctx.lineTo(X(0),pad.t+ch); ctx.closePath();
+  ctx.fillStyle='rgba(33,87,142,0.06)'; ctx.fill();
+
+  // 拐点
+  const marks=[];
+  let pk=0; d.forEach((p,i)=>{ if((p.online||0)>(d[pk].online||0)) pk=i; });
+  if(d[pk]&&d[pk].online) marks.push({i:pk,c:'#276B4E',lb:'峰值'});
+  for(let i=1;i<d.length;i++){
+    if(d[i-1].online && d[i].online && d[i].online<d[i-1].online*0.75){
+      marks.push({i,c:'#C0392B',lb:'骤降'}); break;
+    }
+  }
+  for(let i=1;i<d.length;i++){
+    if(d[i-1].online && d[i].online && d[i].online/d[i-1].online>1.4){
+      marks.push({i,c:'#21578E',lb:'起量'}); break;
+    }
+  }
+  marks.forEach(m=>{
+    const x=X(m.i), y=Yon(d[m.i].online||0);
+    ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2);
+    ctx.fillStyle='#fff'; ctx.fill();
+    ctx.lineWidth=2.2; ctx.strokeStyle=m.c; ctx.stroke();
+    ctx.fillStyle=m.c; ctx.font='600 10px -apple-system,sans-serif'; ctx.textAlign='center';
+    ctx.fillText(m.lb,x,y-10);
+  });
+
+  ctx.fillStyle='#8C8B85'; ctx.font='10px -apple-system,sans-serif'; ctx.textAlign='center';
+  const step=Math.max(1,Math.ceil(d.length/8));
+  d.forEach((p,i)=>{ if(i%step===0) ctx.fillText(p.label,X(i),H-7); });
+}
+
+/* 场次对比页走势：真实仓库序列，本场高亮 */
+function drawStoreTrend(curId){
+  const ordered = STORE.ordered();
+  const data = ordered.map(x=>({
+    date: x.date,
+    gmv: x.snapshot.gmv,
+    uv: x.snapshot.uv,
+    score: x.snapshot.score||0,
+    __cur: x.id===curId,
+  }));
+  drawMulti('cvTrend', data, ['gmv','uv','score'], ['GMV','UV价值','健康分'], ['#21578E','#C0392B','#B8791A']);
+  // 高亮本场：在折线上方画一个标记
+  const cv = document.getElementById('cvTrend'); if(!cv) return;
+  const idx = ordered.findIndex(x=>x.id===curId);
+  if(idx<0) return;
+  const H = cv.parentElement.clientHeight||210;
+  const W = cv.width / (window.devicePixelRatio||1);
+  const pad={l:50,r:14,t:16,b:24};
+  const cw=W-pad.l-pad.r;
+  const x = pad.l + (ordered.length>1 ? cw*idx/(ordered.length-1) : cw/2);
+  const ctx = cv.getContext('2d');
+  ctx.save();
+  ctx.setLineDash([3,3]); ctx.strokeStyle='#21578E'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,H-pad.b); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle='#21578E'; ctx.font='600 10px -apple-system,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('本场', x, pad.t-4);
+}
+
+function drawMulti(id, data, keys, labels, colors){
+  const cv = document.getElementById(id); if(!cv) return;
+  const H = cv.parentElement.clientHeight || 190;
+  const {ctx, W} = setupCanvas(cv, H);
+  const pad={l:50,r:14,t:16,b:24};
+  const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
+  const ranges = keys.map(k=>{
+    const v = data.map(d=>d[k]||0);
+    return {max:Math.max(...v,1)*1.15, min:Math.min(...v)};
+  });
+
+  ctx.strokeStyle='#EDEDE9'; ctx.lineWidth=1;
+  ctx.font='10px -apple-system,sans-serif'; ctx.fillStyle='#8C8B85';
+  for(let i=0;i<=4;i++){
+    const y=pad.t+ch*i/4;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y); ctx.stroke();
+    ctx.textAlign='right'; ctx.fillText(kfmt(ranges[0].max*(4-i)/4), pad.l-6, y+3);
+  }
+  const X=i=>pad.l+(data.length>1?cw*i/(data.length-1):cw/2);
+
+  keys.forEach((k,ki)=>{
+    const r = ranges[ki];
+    ctx.beginPath(); ctx.strokeStyle=colors[ki]; ctx.lineWidth=2;
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    data.forEach((d,i)=>{
+      const x=X(i), y=pad.t+ch*(1-(d[k]||0)/r.max);
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    data.forEach((d,i)=>{
+      const x=X(i), y=pad.t+ch*(1-(d[k]||0)/r.max);
+      ctx.beginPath(); ctx.arc(x,y,2.5,0,Math.PI*2);
+      ctx.fillStyle=colors[ki]; ctx.fill();
+    });
+  });
+
+  ctx.fillStyle='#8C8B85'; ctx.font='10px -apple-system,sans-serif'; ctx.textAlign='center';
+  const step=Math.max(1,Math.ceil(data.length/7));
+  data.forEach((d,i)=>{ if(i%step===0) ctx.fillText(d.date,X(i),H-7); });
+}
+
+function kfmt(v){
+  if(v>=10000) return (v/10000).toFixed(1)+'万';
+  if(v>=1000) return (v/1000).toFixed(1)+'k';
+  return Math.round(v);
+}
+
+/* ==================== 初始化 ==================== */
+/* 只在当前板块确实有画布时重绘，避免隐藏板块产生空画布 */
+window.addEventListener('resize', ()=>{
+  const t = curTab(ST.view);
+  if(ST.view==='report' && t==='traffic' && ST.M && ST.M.flags.hasTimeline) drawChart(ST.M);
+  if(ST.view==='compare' && t==='trend' && ST.curId) drawStoreTrend(ST.curId);
+  if(ST.view==='trend' && t==='chart'){
+    const ordered = STORE.ordered();
+    if(ordered.length>=2){
+      drawMulti('cvGmv', ordered.map(x=>({date:x.date,gmv:x.snapshot.gmv,uv:x.snapshot.uv})), ['gmv','uv'], ['GMV','UV价值'], ['#21578E','#C0392B']);
+      drawMulti('cvStay', ordered.map(x=>({date:x.date,stay:x.snapshot.stay,cvr:x.snapshot.cvr})), ['stay','cvr'], ['平均停留','转化率'], ['#B8791A','#276B4E']);
+      drawMulti('cvScore', ordered.map(x=>({date:x.date,score:x.snapshot.score})), ['score'], ['健康分'], ['#6B4FA8']);
+    }
+  }
+});
+updateBadges();
+
+initHashRouter();
+/* Esc 收起窄屏页面菜单（注意：不要给 Alt+← 绑返回，
+   那是浏览器自带的后退快捷键，两套一起触发会一次退两步） */
+document.addEventListener('keydown', function(e){
+  if(e && e.key === 'Escape') closeViewMenu();
+});
+/* 点空白处收起菜单 */
+document.addEventListener('click', function(){ closeViewMenu(); });
+
+/* 刷新后停在原来那一页：hash 里记着位置就直接进去 */
+(function bootFromHash(){
+  let h = '';
+  try{ h = String((typeof location!=='undefined' && location && location.hash) || ''); }catch(e){ h = ''; }
+  const p = h.replace(/^#\/?/, '').split('/').filter(Boolean);
+  if(p[0] && VIEWS[p[0]]){ go(p[0], {from:'init', k:p[1]}); return; }
+  go('import');
+})();
+</script>
+</body>
+</html>

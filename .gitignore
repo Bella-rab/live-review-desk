@@ -1,0 +1,26 @@
+# ---- 应用发布配置（含本机绝对路径与 appId，不要提交）----
+.wbapp_*.genie
+.workbuddy/
+
+# ---- 导出的场次备份（含真实经营数据，绝不要提交）----
+复盘台_场次备份_*.json
+复盘台_*.json
+
+# ---- 测试与调试残留 ----
+_shot_*.png
+_probe.html
+_cprofile/
+_online_*
+_verify_online.js
+
+# ---- 依赖与构建产物（本项目零依赖，列在这里防手滑）----
+node_modules/
+dist/
+build/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
