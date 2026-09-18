@@ -273,7 +273,7 @@ hr('10. 切换板块的行为');
 ctx.go('report');
 ctx.setTab('product');
 A('ST.tab 记录当前板块', ctx.ST.tab.report==='product', ctx.ST.tab.report);
-A('切换后页签高亮跟着变', /tab on"[^>]*>[^<]*<span[^>]*>▦<\/span>商品表现/.test(tabsHTML()) || tabsHTML().includes('商品表现') , true);
+A('切换后页签高亮跟着变', /class="tab on"[^>]*>商品表现/.test(tabsHTML()), tabsHTML().slice(0,140));
 A('切换后滚动位置归零', getEl('scroll').scrollTop===0, getEl('scroll').scrollTop);
 const before = scrollHTML();
 ctx.setTab('issues');
@@ -285,7 +285,15 @@ hr('11. 场次对比 / 主播 / 趋势 各板块');
 ctx.ST.curId = ctx.STORE.all()[0].id;
 ctx.ST.tab.compare='gap'; ctx.go('compare');
 h = scrollHTML();
-A('差距概览含 KPI', h.includes('kpi-v'), true);
+/* 差距概览页在改版中重做过：从「4 个 KPI 卡 + 一句结论」换成差距明细表。
+   这里锁的是「能一眼看出差距在哪」这个功能，而不是某几个 class 名。 */
+A('差距概览含结论条', /项好于均值|项低于均值|各项波动都在/.test(h), true);
+A('差距概览含差距明细表', h.includes('差距明细'), true);
+A('差距明细表按差距排出顺序（每项一行）',
+  (h.match(/class="gbar"/g) || []).length >= 3, (h.match(/class="gbar"/g) || []).length);
+A('差距明细表带判定列', /badge b-(red|amber|green|gray)">(两项都落后|一项落后|好于基准|持平)/.test(h), true);
+A('差距明细表同时给出历史均值与品类基准', h.includes('历史均值') && h.includes('品类基准'), true);
+A('不再靠 4 个 KPI 卡撑起整页', !h.includes('class="grid g4"'), true);
 A('差距概览含对比结论', h.includes('对比结论'), true);
 A('差距概览含对比基准选择器', h.includes('对比基准'), true);
 ctx.setTab('detail'); h = scrollHTML();
