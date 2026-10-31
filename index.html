@@ -6,32 +6,62 @@
 <title>复盘台 · 直播运营作战系统</title>
 <style>
   /* ============================================================
-     复盘台 · 设计系统
-     规则（刻意收敛，别再加回去）：
-     1. 字号只有 5 档：11 / 12 / 13 / 16 / 22 / 26，全部 ≥11px，不再出现 9~10.5px
-     2. 颜色只有 1 主色 + 3 语义色 + 灰阶；语义色只上数据，不做装饰
-     3. 不用图标字体、不用 emoji、不用装饰性字符；需要指示符用纯 CSS 绘制
-     4. 数字一律 tabular-nums，右对齐；不用等宽字体做正文，避免「终端感」
-     5. 圆角只有 2 档（8 / 6）+ 胶囊；层级靠留白和字重，不靠描边和阴影
+     复盘台 · 设计系统 v2
+     ------------------------------------------------------------
+     这一版的目标是「看起来像一个用了五年的内部工具」，
+     不是「看起来像一个刚被生成出来的仪表盘」。为此定下几条硬规则：
+
+     1. 不用卡片。信息块靠留白和一条 1px 分隔线分层，
+        不靠「白底 + 描边 + 圆角」的盒子套盒子。
+     2. 语义色只落在数字和文字上，绝不铺背景。
+        一片全绿在数据工具里等于没有信号 —— 全部正常时应该安静。
+     3. 不写副标题。标题就是标题，需要解释的地方单独写一行说明，
+        不挂在每个标题后面当小尾巴。
+     4. 不用装饰性色条 / 圆环 / 进度条。没有刻度就没有信息量。
+     5. 字号只有 4 档：11 / 12 / 14 / 20。层级靠字重和颜色。
+     6. 数字一律 tabular-nums 右对齐；单位不抢数字的视觉权重。
+     7. 图表颜色单独一组（--ch-*），但同样克制：
+        第一条线是墨色（主角），第二条是灰，第三条才开始有颜色。
+        canvas 不能读 CSS 变量，所以 JS 里有一份对应的常量（CHART_COLORS）。
      ============================================================ */
   :root{
-    --bg:#F7F7F5; --surface:#FFFFFF; --surface-2:#F2F2EF; --surface-3:#E8E8E4;
-    --border:#E5E5E0; --border-strong:#C8C8C2;
-    --text:#1A1A18; --text-2:#55554F; --text-3:#8A8A83;
+    --bg:#FAFAF9; --surface:#FFFFFF;
+    --hover:#F4F4F2;
 
-    --accent:#185FA5; --accent-soft:#EDF3FA; --accent-line:#BBD2E8;
+    /* 图表专用：按「主/次/辅」排序，不按色相堆叠。
+       --ch-axis 与 --ch-2 必须 ≥3.0:1（WCAG 图形元素标准），
+       否则坐标刻度在浅底上根本读不出来。 */
+    --ch-1:#3A3A36;   /* 主序列（在线人数 / GMV / 健康分） */
+    --ch-2:#7C7C76;   /* 次序列（成交额 / UV 价值 / 转化率） */
+    --ch-3:#A93A2C;   /* 第三序列，用语义红以示区别 */
+    --ch-grid:#EDEDE9;
+    --ch-axis:#7C7C76;
+    --border:#E7E7E3; --border-strong:#D4D4CE;
+    /* 三级文字都按 WCAG AA 反算过：辅助文字也不是装饰，
+       它承载指标名和单位，2.96:1 那种灰在实际屏幕上读不清。 */
+    --text:#171717; --text-2:#4A4A46; --text-3:#70706C;
 
-    --red:#B93A2C;   --red-bg:#FBEEEC;   --red-line:#E3B2AA;
-    --amber:#8F6410; --amber-bg:#FAF2E3; --amber-line:#E0CFA4;
-    --green:#22684A; --green-bg:#E9F2ED; --green-line:#B2D1C0;
+    --accent:#1F5FA0;
 
-    /* 兼容既有内联样式与动态类名引用 */
-    --blue:var(--accent); --blue-bg:var(--accent-soft); --blue-line:var(--accent-line);
-    --purple:#5C5C55; --purple-bg:var(--surface-2); --purple-line:var(--border);
+    --red:#A93A2C;
+    --amber:#8A6209;
+    --green:#1F6A46;
+
+    /* 兼容既有内联样式与动态类名；新代码不要再引用带 -bg 的变量 */
+    --surface-2:var(--hover); --surface-3:#EAEAE6;
+    --red-bg:transparent; --red-line:var(--border);
+    --amber-bg:transparent; --amber-line:var(--border);
+    --green-bg:transparent; --green-line:var(--border);
+    --accent-soft:transparent; --accent-line:var(--border-strong);
+    --blue:var(--accent); --blue-bg:transparent; --blue-line:var(--border-strong);
+    --purple:#5C5C57; --purple-bg:transparent; --purple-line:var(--border);
     --bg-card:var(--surface);
 
-    --radius:8px; --radius-sm:6px;
-    --fs-xl:22px; --fs-lg:16px; --fs-md:13px; --fs-sm:12px; --fs-xs:11px;
+    --radius:4px; --radius-sm:4px;
+    /* 四档字号。辅助文字从 11px 提到 12px：
+       11px 的中文在 1x 屏上笔画会糊，加上 --text-3 必须加深才达标，
+       两者叠加会让「小字」既难读又突兀。12px + 4.76:1 是这一版的平衡点。 */
+    --fs-xl:20px; --fs-lg:14px; --fs-md:13px; --fs-sm:12px; --fs-xs:12px;
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -44,294 +74,343 @@
   :focus-visible{outline:2px solid var(--accent);outline-offset:1px}
   .app{display:flex;height:100vh;overflow:hidden}
 
-  /* ===== 侧栏（浅色，纯文字导航）===== */
-  .side{width:172px;flex-shrink:0;background:var(--surface);
+  /* ===== 侧栏 ===== */
+  .side{width:168px;flex-shrink:0;background:var(--bg);
     border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
-  .brand{padding:20px 18px 14px}
-  .brand h1{font-size:var(--fs-lg);font-weight:600;letter-spacing:-.2px}
-  .brand p{font-size:var(--fs-xs);color:var(--text-3);margin-top:4px}
-  .nav{padding:4px 10px 16px;flex:1}
-  .nav-sec{font-size:var(--fs-xs);color:var(--text-3);padding:16px 9px 6px;
-    letter-spacing:.06em;font-weight:500}
-  .nav-i{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius-sm);
-    font-size:var(--fs-md);color:var(--text-2);cursor:pointer;user-select:none;margin-bottom:1px}
-  .nav-i:hover{background:var(--surface-2);color:var(--text)}
-  .nav-i.on{background:var(--accent-soft);color:var(--accent);font-weight:600;
-    box-shadow:inset 2px 0 0 var(--accent)}
+  .brand{padding:18px 16px 12px}
+  .brand h1{font-size:var(--fs-lg);font-weight:600;letter-spacing:-.1px}
+  .brand p{font-size:var(--fs-xs);color:var(--text-3);margin-top:2px}
+  .nav{padding:0 8px 16px;flex:1}
+  .nav-sec{font-size:var(--fs-xs);color:var(--text-3);padding:14px 8px 4px;
+    font-weight:500}
+  /* 导航项用 <button> 而不是 <div>：原生 Tab 可达、Enter/Space 触发、
+     屏幕阅读器会念成「按钮」。代价是要把 UA 默认样式清干净。 */
+  .nav-i{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:var(--radius-sm);
+    font-size:var(--fs-md);color:var(--text-2);cursor:pointer;user-select:none;margin-bottom:1px;
+    width:100%;text-align:left;font-family:inherit;line-height:inherit;
+    background:none;border:0}
+  .nav-i:hover{background:var(--hover);color:var(--text)}
+  .nav-i.on{background:var(--hover);color:var(--text);font-weight:600}
   .nav-i .ii{display:none}
-  .nav-i .cnt{margin-left:auto;font-size:var(--fs-xs);background:var(--red);color:#fff;
-    padding:0 5px;border-radius:999px;line-height:16px;min-width:17px;text-align:center;font-weight:500}
+  .nav-i .cnt{margin-left:auto;font-size:var(--fs-xs);color:var(--text-3);
+    min-width:16px;text-align:right;font-weight:500}
   .nav-i.dis{opacity:.4;cursor:not-allowed}
   .nav-i.dis:hover{background:transparent;color:var(--text-2)}
-  .side-foot{padding:13px 18px;border-top:1px solid var(--border);
+  .side-foot{padding:12px 16px;border-top:1px solid var(--border);
     font-size:var(--fs-xs);color:var(--text-3);line-height:1.7}
 
   /* ===== 主区 ===== */
   .main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
-  .topbar{height:58px;flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);
-    display:flex;align-items:center;gap:12px;padding:0 22px;flex-wrap:nowrap;overflow-x:auto}
-  .tb-title{font-size:var(--fs-lg);font-weight:600;letter-spacing:-.2px;white-space:nowrap}
-  .tb-sep{width:1px;height:18px;background:var(--border);flex-shrink:0}
+  .topbar{height:52px;flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:12px;padding:0 24px;flex-wrap:nowrap;overflow-x:auto}
+  .tb-title{font-size:var(--fs-lg);font-weight:600;white-space:nowrap}
+  .tb-sep{width:1px;height:16px;background:var(--border);flex-shrink:0}
   .tb-meta{font-size:var(--fs-sm);color:var(--text-3);white-space:nowrap}
   .tb-right{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
 
   /* 返回键 */
   .tb-back{flex-shrink:0;display:flex;align-items:center}
   .tb-back:empty{display:none}
-  .btn.back{padding:5px 11px}
-  .btn.back:hover{background:var(--surface-2)}
+  .btn.back{padding:4px 10px}
+  .btn.back:hover{background:var(--hover)}
   .btn.back .bk-lb{display:inline-block;max-width:158px;overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap;vertical-align:bottom;font-weight:400;color:var(--text-3);margin-left:5px}
   /* 窄屏（侧栏被隐藏）才出现的页面切换菜单 */
   .only-narrow{display:none !important}
   @media(max-width:960px){ .only-narrow{display:inline-flex !important} }
-  .vmenu{position:fixed;top:64px;right:14px;z-index:90;background:var(--surface);
-    border:1px solid var(--border-strong);border-radius:var(--radius);padding:5px;
-    box-shadow:0 8px 24px rgba(0,0,0,.1);min-width:172px;
+  .vmenu{position:fixed;top:58px;right:14px;z-index:90;background:var(--surface);
+    border:1px solid var(--border-strong);border-radius:var(--radius);padding:4px;
+    box-shadow:0 6px 20px rgba(0,0,0,.08);min-width:168px;
     max-width:calc(100vw - 28px);max-height:70vh;overflow-y:auto}
-  .vmenu .vm-sec{font-size:var(--fs-xs);color:var(--text-3);padding:8px 10px 3px;letter-spacing:.06em}
-  .vmenu .vm-i{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);
+  .vmenu .vm-sec{font-size:var(--fs-xs);color:var(--text-3);padding:7px 9px 3px}
+  .vmenu .vm-i{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:var(--radius-sm);
     font-size:var(--fs-md);color:var(--text-2);cursor:pointer;white-space:nowrap}
-  .vmenu .vm-i:hover{background:var(--surface-2);color:var(--text)}
-  .vmenu .vm-i.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .vmenu .vm-i:hover{background:var(--hover);color:var(--text)}
+  .vmenu .vm-i.on{background:var(--hover);color:var(--text);font-weight:600}
   .vmenu .vm-i .ii{display:none}
 
   /* ===== 按钮 ===== */
-  .btn{padding:6px 13px;border-radius:var(--radius-sm);font-size:var(--fs-sm);font-weight:500;
+  .btn{padding:5px 12px;border-radius:var(--radius-sm);font-size:var(--fs-sm);font-weight:500;
     cursor:pointer;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);
     white-space:nowrap;font-family:inherit;transition:background .12s,border-color .12s}
-  .btn:hover{background:var(--surface-2)}
-  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .btn.pri:hover{background:#14507F}
-  .btn.sm{padding:4px 10px;font-size:var(--fs-xs)}
+  .btn:hover{background:var(--hover)}
+  .btn.pri{background:var(--text);color:#fff;border-color:var(--text)}
+  .btn.pri:hover{background:#000}
+  .btn.sm{padding:3px 9px;font-size:var(--fs-xs)}
 
-  .scroll{flex:1;overflow-y:auto;padding:20px 22px 64px}
+  .scroll{flex:1;overflow-y:auto;padding:24px 28px 72px}
   .scroll::-webkit-scrollbar,.side::-webkit-scrollbar{width:10px;height:10px}
   .scroll::-webkit-scrollbar-thumb,.side::-webkit-scrollbar-thumb{
-    background:#D5D5CF;border-radius:6px;border:3px solid transparent;background-clip:content-box}
+    background:#D8D8D2;border-radius:6px;border:3px solid transparent;background-clip:content-box}
 
   /* ===== 子页签（维度切换条）===== */
   .tabs{flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);
-    display:flex;align-items:stretch;gap:2px;padding:0 22px;overflow-x:auto;scrollbar-width:none}
+    display:flex;align-items:stretch;gap:0;padding:0 24px;overflow-x:auto;scrollbar-width:none}
   .tabs::-webkit-scrollbar{height:0;display:none}
-  .tab{flex-shrink:0;padding:0 13px;height:40px;display:inline-flex;align-items:center;gap:7px;
+  .tab{flex-shrink:0;padding:0 14px;height:38px;display:inline-flex;align-items:center;gap:6px;
     font-size:var(--fs-md);color:var(--text-3);cursor:pointer;white-space:nowrap;
-    border-bottom:2px solid transparent;user-select:none;font-family:inherit}
+    border-bottom:1.5px solid transparent;user-select:none;font-family:inherit;
+    /* button 重置：去掉 UA 的背景、边框、内边距和行高 */
+    background:none;border-top:0;border-left:0;border-right:0;line-height:inherit}
   .tab:hover{color:var(--text)}
-  .tab.on{color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}
-  .tab .tb-n{font-size:var(--fs-xs);background:var(--surface-3);color:var(--text-2);
-    padding:0 5px;border-radius:999px;line-height:16px;min-width:17px;text-align:center;font-weight:500}
-  .tab.on .tb-n{background:var(--accent);color:#fff}
-  .tab .tb-n.hot{background:var(--red);color:#fff}
+  .tab.on{color:var(--text);font-weight:600;border-bottom-color:var(--text)}
+  /* 页签计数：默认只是灰色数字，有 P0 时才标红 */
+  .tab .tb-n{font-size:var(--fs-xs);background:none;color:var(--text-3);
+    padding:0;border-radius:0;line-height:inherit;min-width:0;text-align:center;font-weight:500}
+  .tab.on .tb-n{color:var(--text);font-weight:600}
+  .tab .tb-n.hot{color:var(--red);font-weight:600}
 
-  /* ===== 维度卡片（总览页的跳转入口）===== */
-  .dims{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-  .dim{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-    padding:14px 15px;cursor:pointer;min-width:0;transition:border-color .12s}
-  .dim:hover{border-color:var(--accent-line)}
-  .dim-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
-  .dim-t{font-size:var(--fs-md);font-weight:600;display:flex;align-items:center;gap:6px}
+  /* ===== 维度入口（总览页）=====
+     不用卡片：每项只有标题 + 两三行读数，靠一条上边线分隔。 */
+  .dims{display:grid;grid-template-columns:repeat(3,1fr);gap:0 32px}
+  .dim{border-top:1px solid var(--border);padding:12px 0 16px;cursor:pointer;min-width:0}
+  .dim:hover .dim-t{color:var(--accent)}
+  .dim-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+  .dim-t{font-size:var(--fs-md);font-weight:600;display:flex;align-items:center;gap:6px;
+    transition:color .12s}
   .dim-t .ii{display:none}
-  .dim-go{font-size:var(--fs-xs);color:var(--accent);opacity:0;transition:opacity .12s}
+  .dim-go{font-size:var(--fs-xs);color:var(--text-3);opacity:0;transition:opacity .12s}
   .dim:hover .dim-go{opacity:1}
   .dim-line{font-size:var(--fs-sm);color:var(--text-2);display:flex;align-items:baseline;
-    justify-content:space-between;gap:10px;padding:4px 0}
-  .dim-line b{font-weight:600;flex-shrink:0;color:var(--text)}
+    justify-content:space-between;gap:10px;padding:2px 0}
+  .dim-line b{font-weight:500;flex-shrink:0;color:var(--text)}
   .dim-line .lb{color:var(--text-3)}
-  .dim.sum{background:var(--surface-2)}
-  .dim.sum:hover{cursor:default;border-color:var(--border)}
+  .dim.sum{cursor:default}
+  .dim.sum:hover .dim-t{color:var(--text)}
 
-  /* ===== 网格与卡片 ===== */
-  .grid{display:grid;gap:12px;margin-bottom:12px}
+  /* ===== 网格 =====
+     align-items:start 很关键：网格默认 stretch，两栏会被拉成等高，
+     内容少的那一栏会在底部留出大片空白，看起来像布局塌了。 */
+  .grid{display:grid;gap:0 32px;margin-bottom:0;align-items:start}
   .g4{grid-template-columns:repeat(4,1fr)}
   .g3{grid-template-columns:repeat(3,1fr)}
   .g2{grid-template-columns:repeat(2,1fr)}
   .g21{grid-template-columns:2fr 1fr}
-  .g12{grid-template-columns:1fr 2fr}
+  .g12{grid-template-columns:180px 1fr}
   .g31{grid-template-columns:3fr 1fr}
 
-  .card{background:var(--surface);border:1px solid var(--border);
-    border-radius:var(--radius);padding:16px;min-width:0}
-  .card.pad0{padding:0;overflow:hidden}
-  .ch{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
-    margin-bottom:12px;padding-bottom:9px;border-bottom:1px solid var(--border)}
-  .ct{font-size:var(--fs-md);font-weight:600;display:flex;align-items:center;gap:7px}
-  .ct .tagline{font-size:var(--fs-xs);font-weight:400;color:var(--text-3)}
-  .cs{font-size:var(--fs-sm);color:var(--text-3);white-space:nowrap}
+  /* ===== 区块 =====
+     取代原来的「卡片」：没有背景、没有描边、没有圆角，
+     只用一条顶部横线 + 标题行把内容分开。
+     保留 .card 这个类名是因为渲染函数到处都是它；
+     但现在它渲染出来是「一个区块」，不是一个盒子。 */
+  .card{background:transparent;border:0;border-top:1px solid var(--border);
+    border-radius:0;padding:16px 0 22px;min-width:0}
+  .card.pad0{padding:16px 0 22px;overflow:visible}
+  .ch{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    margin-bottom:12px}
+  .ct{font-size:var(--fs-md);font-weight:600;display:flex;align-items:baseline;gap:8px}
+  .ct .tagline{display:none}          /* 副标题一律不显示 */
+  .cs{font-size:var(--fs-xs);color:var(--text-3);white-space:nowrap}
 
-  /* ===== KPI ===== */
-  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 15px}
-  .kpi-l{font-size:var(--fs-xs);color:var(--text-3);margin-bottom:6px}
-  .kpi-v{font-size:var(--fs-xl);font-weight:600;letter-spacing:-.5px;line-height:1.15}
-  .kpi-v small{font-size:var(--fs-sm);font-weight:400;color:var(--text-3);letter-spacing:0;margin-left:3px}
-  .kpi-d{font-size:var(--fs-xs);margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-  .kpi-bar{height:3px;border-radius:2px;background:var(--surface-3);margin-top:10px;overflow:hidden}
-  .kpi-bar i{display:block;height:100%;border-radius:2px}
+  /* ===== 指标（取代 KPI 卡）=====
+     四个数字排成一行，只有一条灰线分隔。 */
+  .kpi{background:transparent;border:0;border-top:1px solid var(--border);
+    border-radius:0;padding:12px 0 16px}
+  /* 顶线画在容器上，避免四段短线之间出现 32px 缺口。
+     :has() 不支持时退回「每列一条」，只是观感差一点，不影响可用性。 */
+  @supports selector(:has(*)){
+    .grid:has(> .kpi){border-top:1px solid var(--border)}
+    .grid:has(> .kpi) > .kpi{border-top:0;padding-top:14px}
+  }
+  .kpi-l{font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px}
+  .kpi-v{font-size:var(--fs-xl);font-weight:600;letter-spacing:-.4px;line-height:1.2}
+  .kpi-v small{font-size:var(--fs-sm);font-weight:400;color:var(--text-3);letter-spacing:0;margin-left:2px}
+  .kpi-d{font-size:var(--fs-xs);margin-top:4px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+  .kpi-bar{display:none}                /* 无刻度装饰条直接移除 */
   .up{color:var(--red)} .down{color:var(--green)} .flat{color:var(--text-3)}
-  .badge{font-size:var(--fs-xs);padding:1px 7px;border-radius:999px;font-weight:500;
-    display:inline-block;line-height:17px;background:var(--surface-2);color:var(--text-2)}
-  .b-red{background:var(--red-bg);color:var(--red)}
-  .b-amber{background:var(--amber-bg);color:var(--amber)}
-  .b-green{background:var(--green-bg);color:var(--green)}
-  .b-blue{background:var(--accent-soft);color:var(--accent)}
-  .b-purple{background:var(--surface-2);color:var(--text-2)}
-  .b-gray{background:var(--surface-2);color:var(--text-2)}
+  /* 标签：只保留文字，不要胶囊底色（否则一屏十几个色块） */
+  .badge{font-size:var(--fs-xs);padding:0;border-radius:0;font-weight:500;
+    display:inline-block;line-height:inherit;background:none;color:var(--text-2)}
+  .b-red{background:none;color:var(--red)}
+  .b-amber{background:none;color:var(--amber)}
+  .b-green{background:none;color:var(--green)}
+  .b-blue{background:none;color:var(--accent)}
+  .b-purple{background:none;color:var(--text-2)}
+  .b-gray{background:none;color:var(--text-3)}
 
   /* ===== 健康分 ===== */
   .score-hero{display:flex;gap:18px;align-items:center}
-  .ring{position:relative;width:92px;height:92px;flex-shrink:0}
+  .ring{position:relative;width:68px;height:68px;flex-shrink:0}
   .ring-num{position:absolute;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center}
-  .ring-num b{font-size:26px;font-weight:600;letter-spacing:-1px;line-height:1}
-  .ring-num span{font-size:var(--fs-xs);color:var(--text-3);margin-top:3px}
+  .ring-num b{font-size:20px;font-weight:600;letter-spacing:-.5px;line-height:1}
+  .ring-num span{font-size:var(--fs-xs);color:var(--text-3);margin-top:2px}
 
-  /* ===== 诊断行 ===== */
-  .diag{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)}
+  /* ===== 诊断行 =====
+     右侧数值列宽度不固定时，长证据串（「5 段讲解·转化 2.1%·贡献 16.2%」）
+     会把左侧标题挤成一两字一行。给数值列一个上限，超长就换行而不是挤压。 */
+  .diag{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)}
   .diag:last-child{border-bottom:none;padding-bottom:0}
-  .dsev{width:3px;border-radius:2px;align-self:stretch;flex-shrink:0;min-height:32px}
-  .dsev.high{background:var(--red)} .dsev.mid{background:var(--amber)} .dsev.low{background:var(--accent)}
-  .dbody{flex:1;min-width:0}
-  .dtxt{font-size:var(--fs-md);line-height:1.5;font-weight:500}
-  .dmeta{font-size:var(--fs-xs);color:var(--text-3);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap}
-  .dnum{font-size:var(--fs-md);font-weight:600;text-align:right;white-space:nowrap}
+  /* 严重度用一条细竖线表示，不做色块 */
+  .dsev{width:2px;border-radius:0;align-self:stretch;flex-shrink:0;min-height:28px}
+  .dsev.high{background:var(--red)} .dsev.mid{background:var(--amber)} .dsev.low{background:var(--border-strong)}
+  .dbody{flex:1;min-width:0;padding-right:4px}
+  .dtxt{font-size:var(--fs-md);line-height:1.55;font-weight:400}
+  .dmeta{font-size:var(--fs-xs);color:var(--text-3);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap}
+  .dnum{font-size:var(--fs-md);font-weight:500;text-align:right;flex-shrink:0;
+    max-width:min(38%, 240px);white-space:normal;word-break:break-word;
+    font-variant-numeric:tabular-nums;line-height:1.5}
 
   /* ===== 表格 ===== */
   table{width:100%;border-collapse:collapse;font-size:var(--fs-md)}
-  th{text-align:left;font-size:var(--fs-xs);font-weight:600;color:var(--text-3);
-    padding:8px 10px;border-bottom:1px solid var(--border-strong);white-space:nowrap;
-    background:var(--surface);position:sticky;top:0;z-index:1;letter-spacing:.02em}
-  td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+  th{text-align:left;font-size:var(--fs-xs);font-weight:500;color:var(--text-3);
+    padding:6px 10px 6px 0;border-bottom:1px solid var(--border-strong);white-space:nowrap;
+    background:var(--bg);position:sticky;top:0;z-index:1}
+  td{padding:8px 10px 8px 0;border-bottom:1px solid var(--border);vertical-align:middle}
   tr:last-child td{border-bottom:none}
-  tbody tr:hover{background:var(--surface-2)}
+  tbody tr:hover{background:var(--hover)}
   .num{text-align:right;font-variant-numeric:tabular-nums}
   .tb-wrap{max-height:none;overflow:auto}
 
-  /* ===== 热力条 ===== */
-  .heat{display:flex;gap:3px;align-items:flex-end;height:110px;padding:0 2px}
-  .hbar{flex:1;min-width:5px;border-radius:2px 2px 0 0;position:relative;cursor:pointer}
-  .hbar:hover{opacity:.78}
-  .heat-x{display:flex;gap:3px;font-size:var(--fs-xs);color:var(--text-3);margin-top:6px;padding:0 2px}
-  .heat-x span{flex:1;min-width:5px;text-align:center;overflow:hidden}
+  /* ===== 时段热力 =====
+     柱高放进线人数，柱底 3px 细带放效率。
+     整根柱子染色会在大屏上糊成一片色块，异常反而看不出来。 */
+  .heat{display:flex;gap:2px;align-items:flex-end;height:96px;padding:0}
+  .hbar{flex:1;min-width:4px;border-radius:0;position:relative;cursor:pointer;overflow:hidden}
+  .hbar:hover{opacity:.75}
+  .hbar i{position:absolute;left:0;right:0;bottom:0;height:3px;display:block}
+  .heat-x{display:flex;gap:2px;font-size:var(--fs-xs);color:var(--text-3);margin-top:5px;padding:0}
+  .heat-x span{flex:1;min-width:4px;text-align:center;overflow:hidden}
 
-  /* ===== 四象限 ===== */
-  .quad{position:relative;height:230px;border-left:1px solid var(--border-strong);
-    border-bottom:1px solid var(--border-strong);margin:16px 8px 28px 30px}
+  /* ===== 四象限 =====
+     象限名做成水印（浅灰、不可交互），商品名默认隐藏、悬停才出现。
+     否则点一多，商品名和象限名会互相压住。 */
+  .quad{position:relative;height:220px;border-left:1px solid var(--border-strong);
+    border-bottom:1px solid var(--border-strong);margin:20px 8px 30px 30px}
   .qd{position:absolute;font-size:var(--fs-xs);color:var(--text-3)}
-  .qpt{position:absolute;border-radius:50%;cursor:pointer}
-  .qpt:hover{transform:scale(1.4);z-index:5}
-  .q-lbl{position:absolute;font-size:var(--fs-xs);color:var(--text-2);white-space:nowrap;
-    transform:translate(-50%,-50%)}
+  .q-water{position:absolute;font-size:var(--fs-xs);color:#C6C6C0;pointer-events:none;
+    user-select:none;letter-spacing:.02em}
+  .qpt{position:absolute;width:9px;height:9px;border-radius:50%;cursor:pointer;
+    margin-left:-4.5px;margin-top:-4.5px}
+  .qpt:hover{z-index:5}
+  /* 标签浮在点的右上方，只在悬停时显示 */
+  .qpt span{position:absolute;left:12px;top:-4px;white-space:nowrap;display:none;
+    font-size:var(--fs-xs);color:var(--text);background:var(--bg);padding:0 4px;
+    border:1px solid var(--border);border-radius:2px}
+  .qpt:hover span{display:block}
 
-  /* ===== 漏斗 ===== */
-  .fun{display:flex;flex-direction:column;gap:5px}
-  .fs{display:grid;grid-template-columns:104px 1fr 78px 88px;gap:12px;align-items:center}
+  /* ===== 漏斗 =====
+     漏斗是这一页的主内容，行高给足；以前一行只有 16px 高，
+     三行加起来撑不满右栏，视觉上像布局塌了。 */
+  .fun{display:flex;flex-direction:column;gap:10px}
+  .fs{display:grid;grid-template-columns:104px 1fr 84px 96px;gap:14px;align-items:center;
+    padding:6px 0}
   .fsn{font-size:var(--fs-md);color:var(--text-2);white-space:nowrap}
-  .fsw{height:22px;background:var(--surface-2);border-radius:4px;overflow:hidden}
-  .fsb{height:100%;border-radius:4px}
+  .fsw{height:26px;background:var(--hover);border-radius:2px;overflow:hidden}
+  .fsb{height:100%;border-radius:2px}
   .fsv{font-size:var(--fs-md);font-weight:600;text-align:right}
   .fsr{font-size:var(--fs-sm);text-align:right}
   .fs.break .fsn{color:var(--red);font-weight:600}
-  .btag{font-size:var(--fs-xs);background:var(--red);color:#fff;padding:0 5px;
-    border-radius:3px;margin-left:5px;font-weight:500}
+  /* 断点标记：纯文字，不用实色胶囊 */
+  .btag{font-size:var(--fs-xs);color:var(--red);margin-left:6px;font-weight:500}
 
   /* ===== 图表 ===== */
   .chart{position:relative;height:170px;width:100%}
-  .lg{display:flex;gap:16px;font-size:var(--fs-sm);color:var(--text-2);margin-bottom:10px;flex-wrap:wrap}
-  .lg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  .lg{display:flex;gap:16px;font-size:var(--fs-xs);color:var(--text-3);margin-bottom:8px;flex-wrap:wrap}
+  .lg i{display:inline-block;width:8px;height:2px;border-radius:0;margin-right:6px;vertical-align:2px}
 
   /* ===== 差距明细（差距概览页核心表）===== */
-  .gbar{position:relative;width:120px;height:16px;background:var(--surface-2);border-radius:3px;
+  .gbar{position:relative;width:110px;height:12px;background:var(--hover);border-radius:2px;
     overflow:hidden}
-  .gbar i{position:absolute;top:0;bottom:0;border-radius:3px}
+  .gbar i{position:absolute;top:0;bottom:0;border-radius:2px}
   .gbar u{position:absolute;top:-2px;bottom:-2px;width:1px;background:var(--border-strong);text-decoration:none}
 
   /* ===== 方案 ===== */
-  .plan{background:var(--surface-2);border-radius:var(--radius-sm);padding:12px 13px;margin-top:10px}
-  .plan-t{font-size:var(--fs-md);font-weight:600;margin-bottom:9px}
-  .step{display:flex;gap:10px;padding:6px 0;font-size:var(--fs-md);line-height:1.55}
-  .step-n{width:18px;height:18px;border-radius:50%;background:var(--text);color:#fff;
-    font-size:var(--fs-xs);display:grid;place-items:center;flex-shrink:0;margin-top:2px;font-weight:600}
+  .plan{background:transparent;border-left:2px solid var(--border);border-radius:0;
+    padding:2px 0 2px 14px;margin-top:10px}
+  .plan-t{font-size:var(--fs-sm);font-weight:600;margin-bottom:6px}
+  .step{display:flex;gap:9px;padding:3px 0;font-size:var(--fs-sm);line-height:1.6}
+  .step-n{width:15px;flex-shrink:0;font-size:var(--fs-xs);color:var(--text-3);
+    text-align:right;line-height:1.75}
   .step-l{font-weight:600;flex-shrink:0}
   .step-d{color:var(--text-2)}
-  .tpl{margin-top:10px;padding:11px 13px;background:var(--text);color:#EFEFEC;
-    border-radius:var(--radius-sm);font-size:var(--fs-md);line-height:1.7;position:relative}
-  .tpl::before{content:'话术/模板';position:absolute;top:-8px;left:11px;
-    font-size:var(--fs-xs);background:var(--surface);color:var(--text-3);
-    padding:0 5px;border-radius:3px;border:1px solid var(--border)}
-  .sched{width:100%;border-collapse:collapse;font-size:var(--fs-md);margin-top:9px}
+  /* 话术模板：用左边线标记引用块，不做深色卡片 */
+  .tpl{margin-top:10px;padding:2px 0 2px 12px;border-left:2px solid var(--text-3);
+    color:var(--text-2);font-size:var(--fs-sm);line-height:1.7;position:relative}
+  .tpl::before{content:'话术模板';display:block;font-size:var(--fs-xs);
+    color:var(--text-3);margin-bottom:3px}
+  .sched{width:100%;border-collapse:collapse;font-size:var(--fs-sm);margin-top:8px}
   .sched th{background:transparent;border-bottom:1px solid var(--border-strong);
-    font-size:var(--fs-xs);padding:6px 9px}
-  .sched td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+    font-size:var(--fs-xs);padding:5px 8px 5px 0}
+  .sched td{padding:6px 8px 6px 0;border-bottom:1px solid var(--border);vertical-align:top}
   .sched tr:last-child td{border-bottom:none}
   .stime{font-size:var(--fs-sm);color:var(--text-2);white-space:nowrap}
 
   /* ===== 折叠问题卡 ===== */
-  .iss{border:1px solid var(--border);border-radius:var(--radius-sm);
-    margin-bottom:8px;overflow:hidden;background:var(--surface)}
-  .iss-h{display:grid;grid-template-columns:3px 1fr auto auto;gap:12px;align-items:center;
-    padding:12px 14px;cursor:pointer}
-  .iss-h:hover{background:var(--surface-2)}
-  .iss-t{font-size:var(--fs-md);font-weight:500;line-height:1.5}
-  .iss-m{font-size:var(--fs-xs);color:var(--text-3);margin-top:3px}
+  .iss{border:0;border-bottom:1px solid var(--border);border-radius:0;
+    margin-bottom:0;overflow:visible;background:transparent}
+  .iss-h{display:grid;grid-template-columns:2px 1fr auto auto;gap:12px;align-items:center;
+    padding:11px 0;cursor:pointer}
+  .iss-h:hover{background:transparent}
+  .iss-h:hover .iss-t{color:var(--accent)}
+  .iss-t{font-size:var(--fs-md);font-weight:400;line-height:1.5;transition:color .12s}
+  .iss-m{font-size:var(--fs-xs);color:var(--text-3);margin-top:2px}
   /* 展开指示符：纯 CSS 三角，不用图标字符 */
-  .iss-a{width:0;height:0;border-left:5px solid currentColor;
-    border-top:4px solid transparent;border-bottom:4px solid transparent;
+  .iss-a{width:0;height:0;border-left:4px solid currentColor;
+    border-top:3px solid transparent;border-bottom:3px solid transparent;
     color:var(--text-3);transition:transform .16s}
   .iss.open .iss-a{transform:rotate(90deg)}
-  .iss-b{display:none;padding:4px 14px 14px 29px}
+  .iss-b{display:none;padding:2px 0 16px 14px}
   .iss.open .iss-b{display:block}
-  .sect{margin-bottom:12px}
-  .sect-l{font-size:var(--fs-xs);font-weight:600;color:var(--text-3);
-    letter-spacing:.06em;margin-bottom:6px}
-  .ev{background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 12px;font-size:var(--fs-sm)}
-  .ev-r{display:flex;justify-content:space-between;gap:12px;padding:3px 0}
-  .ev-r b{font-weight:600;text-align:right}
-  .sect p{font-size:var(--fs-md);color:var(--text-2);line-height:1.65}
-  .sect ul{margin:0;padding-left:18px}
-  .sect li{font-size:var(--fs-md);color:var(--text-2);margin-bottom:4px;line-height:1.55}
-  .rec{display:inline-flex;align-items:center;font-size:var(--fs-xs);background:var(--amber-bg);
-    color:var(--amber);padding:2px 8px;border-radius:999px;font-weight:500;margin-bottom:10px}
+  .sect{margin-bottom:14px}
+  .sect-l{font-size:var(--fs-xs);font-weight:600;color:var(--text-3);margin-bottom:5px}
+  .ev{background:transparent;border:0;border-radius:0;padding:0;font-size:var(--fs-sm)}
+  .ev-r{display:flex;justify-content:space-between;gap:12px;padding:2px 0;max-width:420px}
+  .ev-r span{color:var(--text-3)}
+  .ev-r b{font-weight:500;text-align:right;color:var(--text)}
+  .sect p{font-size:var(--fs-sm);color:var(--text-2);line-height:1.75}
+  .sect ul{margin:0;padding-left:16px}
+  .sect li{font-size:var(--fs-sm);color:var(--text-2);margin-bottom:3px;line-height:1.6}
+  .rec{display:block;font-size:var(--fs-xs);color:var(--amber);
+    font-weight:500;margin-bottom:8px}
 
   /* ===== 待办 ===== */
-  .td{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+  .td{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);align-items:flex-start}
   .td:last-child{border-bottom:none}
-  .td input{margin-top:3px;width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+  .td input{margin-top:4px;width:13px;height:13px;accent-color:var(--text);cursor:pointer;flex-shrink:0}
   .td-b{flex:1;min-width:0;cursor:pointer}
   .td-t{font-size:var(--fs-md);line-height:1.55}
   .td input:checked + .td-b .td-t{text-decoration:line-through;color:var(--text-3)}
-  .td-tags{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
-  .tg{font-size:var(--fs-xs);padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--text-2)}
-  .tg.p0{background:var(--red-bg);color:var(--red);font-weight:500}
-  .tg.p1{background:var(--amber-bg);color:var(--amber);font-weight:500}
-  .tg.p2{background:var(--accent-soft);color:var(--accent);font-weight:500}
+  .td-tags{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap}
+  .tg{font-size:var(--fs-xs);padding:0;border-radius:0;background:none;color:var(--text-3)}
+  .tg.p0{background:none;color:var(--red);font-weight:500}
+  .tg.p1{background:none;color:var(--amber);font-weight:500}
+  .tg.p2{background:none;color:var(--text-3);font-weight:500}
 
-  /* ===== 导入 ===== */
-  .imp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
-  .imp{border:1px solid var(--border-strong);border-radius:var(--radius-sm);
-    padding:16px 13px;text-align:center;cursor:pointer;background:var(--surface);
-    transition:border-color .12s,background .12s}
-  .imp:hover{border-color:var(--accent);background:var(--accent-soft)}
-  .imp.on{border-color:var(--accent);background:var(--accent-soft)}
+  /* ===== 导入入口 ===== */
+  .imp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0 32px}
+  .imp{border:0;border-top:1px solid var(--border);border-radius:0;
+    padding:12px 0 16px;text-align:left;cursor:pointer;background:transparent;
+    transition:color .12s;opacity:.55}
+  .imp:hover{opacity:1}
+  /* 当前选中的入口：只提高不透明度，不用加粗顶线（那看起来像标题下划线） */
+  .imp.on{opacity:1}
+  .imp.on h4{color:var(--text)}
+  .imp:hover h4{color:var(--accent)}
   .imp .ic{display:none}
-  .imp h4{font-size:var(--fs-md);font-weight:600;margin-bottom:4px}
+  .imp h4{font-size:var(--fs-md);font-weight:600;margin-bottom:2px;
+    transition:color .12s;color:var(--text-2)}
   .imp p{font-size:var(--fs-xs);color:var(--text-3);line-height:1.5}
-  textarea{width:100%;min-height:150px;padding:12px;border:1px solid var(--border-strong);
+  textarea{width:100%;min-height:150px;padding:10px 12px;border:1px solid var(--border-strong);
     border-radius:var(--radius-sm);font-family:var(--mono);font-size:var(--fs-sm);
     line-height:1.7;resize:vertical;background:var(--surface);color:var(--text)}
-  textarea:focus,.inp:focus,select:focus{outline:none;border-color:var(--accent)}
-  select,.inp{padding:6px 10px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);
+  textarea:focus,.inp:focus,select:focus{outline:none;border-color:var(--text-3)}
+  select,.inp{padding:5px 9px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);
     font-size:var(--fs-sm);background:var(--surface);color:var(--text);font-family:inherit}
-  .note{font-size:var(--fs-md);color:var(--text-2);background:var(--surface-2);
-    border-radius:var(--radius-sm);padding:12px 14px;line-height:1.7}
+  /* 说明文字：不加底色，只用左边线和略小的字 */
+  .note{font-size:var(--fs-sm);color:var(--text-2);background:transparent;
+    border-radius:0;border-left:2px solid var(--border);padding:2px 0 2px 12px;line-height:1.7}
   .note b{color:var(--text);font-weight:600}
-  .warn{font-size:var(--fs-sm);background:var(--amber-bg);color:var(--amber);
-    border-radius:var(--radius-sm);padding:11px 14px;line-height:1.65;margin-bottom:12px}
-  .chips{display:flex;gap:6px;flex-wrap:wrap}
-  .chip{font-size:var(--fs-xs);padding:2px 9px;border-radius:999px;background:var(--surface-2);
-    color:var(--text-2);border:1px solid var(--border);white-space:nowrap}
-  .chip.ok{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
-  .chip.miss{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
-  .chip.hi{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
+  .warn{font-size:var(--fs-sm);background:transparent;color:var(--amber);
+    border-radius:0;border-left:2px solid var(--amber);padding:2px 0 2px 12px;
+    line-height:1.65;margin-bottom:12px}
+  .chips{display:flex;gap:10px;flex-wrap:wrap}
+  .chip{font-size:var(--fs-xs);padding:0;border-radius:0;background:none;
+    color:var(--text-3);border:0;white-space:nowrap}
+  .chip.ok{background:none;color:var(--green);border:0}
+  .chip.miss{background:none;color:var(--amber);border:0}
+  .chip.hi{background:none;color:var(--red);border:0}
 
   /* ===== 工具类 ===== */
   .hidden{display:none!important}
@@ -342,37 +421,42 @@
   .muted{color:var(--text-3);font-size:var(--fs-sm)}
   .empty{padding:28px 16px;text-align:center;color:var(--text-3);font-size:var(--fs-md)}
 
-  /* ===== 场次库 ===== */
-  .lib-list{display:flex;flex-direction:column;gap:8px}
-  .lib-row{display:grid;grid-template-columns:88px minmax(0,1fr) repeat(5,64px) 66px 124px;gap:10px;
-    align-items:center;padding:11px 13px;border:1px solid var(--border);
-    border-radius:var(--radius);background:var(--surface)}
-  .lib-row:hover{border-color:var(--border-strong)}
-  .lib-row.cur{border-color:var(--accent);background:var(--accent-soft)}
-  .lib-date{font-weight:600;font-size:var(--fs-md)}
+  /* ===== 场次库 =====
+     用一张表，不用「每行一个卡片」。 */
+  .lib-list{display:flex;flex-direction:column;gap:0}
+  .lib-row{display:grid;grid-template-columns:92px minmax(0,1fr) repeat(5,64px) 60px 118px;gap:12px;
+    align-items:center;padding:9px 0;border-bottom:1px solid var(--border);
+    border-radius:0;background:transparent}
+  .lib-row:hover{background:var(--hover)}
+  .lib-row.cur{background:var(--hover)}
+  .lib-row.cur .lib-date{font-weight:600}
+  .lib-date{font-weight:400;font-size:var(--fs-md)}
   .lib-host{font-size:var(--fs-md);color:var(--text-2);display:flex;align-items:center;gap:6px;min-width:0}
-  .lib-host b{color:var(--text);font-weight:600}
+  .lib-host b{color:var(--text);font-weight:400}
   .lib-note{font-size:var(--fs-xs);color:var(--text-3);overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
   .lib-m{text-align:right;font-size:var(--fs-md)}
   .lib-m span{display:block;font-size:var(--fs-xs);color:var(--text-3);margin-top:1px}
-  .lib-sc{display:flex;align-items:center;justify-content:center}
-  .lib-act{display:flex;gap:5px;justify-content:flex-end;flex-wrap:nowrap;min-width:0}
-  .lib-hd{display:grid;grid-template-columns:88px minmax(0,1fr) repeat(5,64px) 66px 124px;gap:10px;
-    padding:0 13px 7px;font-size:var(--fs-xs);color:var(--text-3)}
+  .lib-sc{display:flex;align-items:center;justify-content:flex-end}
+  .lib-act{display:flex;gap:10px;justify-content:flex-end;flex-wrap:nowrap;min-width:0}
+  .lib-hd{display:grid;grid-template-columns:92px minmax(0,1fr) repeat(5,64px) 60px 118px;gap:12px;
+    padding:0 0 6px;font-size:var(--fs-xs);color:var(--text-3);
+    border-bottom:1px solid var(--border-strong)}
   .lib-hd div:nth-child(n+3){text-align:right}
-  .mini{background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius-sm);
-    color:var(--text-2);font-size:var(--fs-sm);padding:3px 8px;cursor:pointer;
-    white-space:nowrap;font-family:inherit;line-height:1.5}
-  .mini:hover{color:var(--text);border-color:var(--text-3)}
-  .mini.danger:hover{color:var(--red);border-color:var(--red)}
-  /* 待确认态的「确认删除」：实心红底，与灰色描边的「删」形成明确区别 */
-  .mini.danger2{color:#fff;background:var(--red);border-color:var(--red);font-weight:600}
-  .mini.danger2:hover{color:#fff;background:#A03024;border-color:#A03024}
-  .delbar{margin:0 0 12px;padding:10px 13px;border:1px solid var(--border);
-    border-left:3px solid var(--red);border-radius:var(--radius-sm);
-    font-size:var(--fs-md);color:var(--text-2);background:var(--surface)}
-  .empty-lib{text-align:center;padding:48px 20px;color:var(--text-3)}
+  /* 行内操作：文字按钮，不用描边小方块 */
+  .mini{background:none;border:0;border-radius:0;
+    color:var(--text-3);font-size:var(--fs-sm);padding:0;cursor:pointer;
+    white-space:nowrap;font-family:inherit;line-height:1.5;text-decoration:none}
+  .mini:hover{color:var(--text);text-decoration:underline}
+  .mini.danger:hover{color:var(--red);text-decoration:underline}
+  /* 待确认态的「确认删除」：唯一需要抢注意力的地方，用实色 */
+  .mini.danger2{color:#fff;background:var(--red);border:0;border-radius:var(--radius-sm);
+    padding:2px 8px;font-weight:500}
+  .mini.danger2:hover{color:#fff;background:#8E2C22;text-decoration:none}
+  .delbar{margin:0 0 16px;padding:2px 0 2px 12px;border:0;
+    border-left:2px solid var(--red);border-radius:0;
+    font-size:var(--fs-sm);color:var(--text-2);background:transparent}
+  .empty-lib{text-align:left;padding:32px 0;color:var(--text-3)}
   .empty-lib .big{display:none}
   .pick{display:inline-flex;align-items:center;gap:7px;font-size:var(--fs-sm);color:var(--text-3)}
   .pick select{font-size:var(--fs-sm);padding:4px 8px}
@@ -385,68 +469,102 @@
   @media(max-width:960px){
     .side{display:none}
     .g4,.g3,.g2{grid-template-columns:1fr}
-    .scroll{padding:14px 14px 56px}
-    /* 场次清单在窄屏换成卡片式。
+    .grid{gap:0}
+    .scroll{padding:16px 16px 56px}
+    /* 场次清单在窄屏改成竖排。
        9 列网格最小宽度约 616px（固定列 544 + 间隙 72），再加上 #scroll 是 overflow-x:auto，
        内容一溢出就被裁掉 → 操作列（含「删」）实际不可点。
        实测漏网区是 vw∈[821,891]，所以断点取 960（vw>960 时内容区 ≥771px，留足余量）。
        这里改成竖排 + 指标带标签，保证删除按钮永远在屏幕内。 */
     .lib-hd{display:none}
-    .lib-row{display:block;padding:13px}
-    .lib-date{font-size:var(--fs-lg);margin-bottom:4px}
-    .lib-host{margin-bottom:10px}
-    .lib-m{display:inline-block;text-align:left;margin:0 16px 7px 0;font-size:var(--fs-md)}
+    .lib-row{display:block;padding:12px 0;border-bottom:1px solid var(--border)}
+    .lib-date{font-size:var(--fs-lg);margin-bottom:2px}
+    .lib-host{margin-bottom:8px}
+    .lib-m{display:inline-block;text-align:left;margin:0 16px 6px 0;font-size:var(--fs-md)}
     .lib-m::before{content:attr(data-l) " ";font-size:var(--fs-xs);color:var(--text-3);
       font-weight:400;font-variant-numeric:normal}
-    .lib-sc{justify-content:flex-start;margin:2px 0 11px}
+    .lib-sc{justify-content:flex-start;margin:2px 0 10px}
     .lib-sc::before{content:"健康分 ";font-size:var(--fs-xs);color:var(--text-3);margin-right:6px}
-    .lib-act{justify-content:flex-start;gap:8px}
-    .lib-act .mini{padding:7px 15px;font-size:var(--fs-md);border-radius:var(--radius-sm)}
+    .lib-act{justify-content:flex-start;gap:8px;margin-top:4px}
+    /* 窄屏是手指操作：「改」「删」单字按钮的可点区域只有 13×20px，
+       远低于 44×44 的触控下限。这里给足内边距和最小宽度。 */
+    .lib-act .mini{padding:8px 14px;font-size:var(--fs-md);min-width:44px;min-height:36px;
+      display:inline-flex;align-items:center;justify-content:center;
+      border:1px solid var(--border-strong);border-radius:var(--radius-sm)}
+    .lib-act .mini.danger2{padding:8px 14px;min-width:auto}
   }
 
-  /* ===== 裁决卡 ===== */
-  .vcard{border-radius:var(--radius);border:1px solid;padding:16px 18px;margin-bottom:12px}
-  .vcard .vk{font-size:var(--fs-xs);font-weight:600;letter-spacing:.06em;margin-bottom:6px}
-  .vcard .vh{font-size:var(--fs-lg);font-weight:600;letter-spacing:-.2px;line-height:1.5;margin-bottom:9px}
-  .vcard .vr{font-size:var(--fs-md);line-height:1.8}
-  .vmeta{display:flex;gap:18px;flex-wrap:wrap;margin-top:11px;padding-top:10px;
-    border-top:1px solid var(--border);font-size:var(--fs-sm);color:var(--text-2)}
+  /* ===== 裁决区 =====
+     原来的「彩色卡片」改成「一段正文 + 一行元信息」。
+     全部正常时这一块应该是安静的，只在有硬伤时才出现颜色。 */
+  .vcard{border-radius:0;border:0;border-top:1px solid var(--border);
+    padding:18px 0 16px;margin-bottom:0}
+  .vcard .vk{font-size:var(--fs-xs);color:var(--text-3);margin-bottom:5px}
+  .vcard .vh{font-size:var(--fs-lg);font-weight:600;line-height:1.5;margin-bottom:6px}
+  .vcard .vr{font-size:var(--fs-sm);line-height:1.75;color:var(--text-2);max-width:70ch}
+  .vmeta{display:flex;gap:20px;flex-wrap:wrap;margin-top:12px;
+    font-size:var(--fs-xs);color:var(--text-3)}
 
-  /* ===== 链路拆解 ===== */
-  .chain{display:flex;align-items:stretch;overflow-x:auto;padding:2px 0 4px}
-  .chain-i{flex:1;min-width:118px;padding:10px 12px;border-right:1px solid var(--border)}
-  .chain-i:last-child{border-right:none}
-  .chain-i.broken{background:var(--red-bg)}
-  .chain-i.weak{background:var(--amber-bg)}
-  .chain-i.strong{background:var(--green-bg)}
-  .chain-l{font-size:var(--fs-xs);color:var(--text-3);margin-bottom:6px;white-space:nowrap}
-  .chain-v{font-size:18px;font-weight:600;letter-spacing:-.4px;line-height:1.2}
-  .chain-b{font-size:var(--fs-xs);color:var(--text-3);margin-top:4px}
-  .chain-g{font-size:var(--fs-xs);font-weight:600;margin-top:5px;white-space:nowrap}
+  /* ===== 链路拆解 =====
+     六环排成一张紧凑的表，不再每格一个色块。
+     状态只体现在数字颜色和下方的偏离值上。
+     顶线画在容器上（不是每格各画一条），否则六段线之间会有 20px 缺口。 */
+  .chain{display:grid;grid-template-columns:repeat(6,1fr);gap:0 20px;overflow:visible;
+    padding:0;border-top:1px solid var(--border)}
+  .chain-i{flex:none;min-width:0;padding:10px 0 0;border:0;background:transparent}
+  .chain-i.broken,.chain-i.weak,.chain-i.strong{background:transparent}
+  .chain-l{font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px;white-space:nowrap}
+  .chain-v{font-size:17px;font-weight:600;letter-spacing:-.3px;line-height:1.2}
+  .chain-b{font-size:var(--fs-xs);color:var(--text-3);margin-top:2px}
+  .chain-g{font-size:var(--fs-xs);font-weight:500;margin-top:3px;white-space:nowrap}
 
-  /* ===== 动作卡 ===== */
-  .act{border:1px solid var(--border);border-left-width:3px;border-radius:var(--radius-sm);
-    padding:12px 14px;margin-bottom:10px;background:var(--surface)}
-  .act.p0{border-left-color:var(--red)}
-  .act.p1{border-left-color:var(--amber)}
-  .act.p2{border-left-color:var(--accent)}
-  .act-h{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap}
-  .act-do{font-size:var(--fs-md);font-weight:600;line-height:1.55}
-  .act-row{font-size:var(--fs-sm);color:var(--text-2);line-height:1.75;margin-top:6px}
-  .act-row b{color:var(--text);font-weight:600}
+  /* ===== 动作条目 ===== */
+  .act{border:0;border-top:1px solid var(--border);border-left-width:0;
+    border-radius:0;padding:12px 0 14px;margin-bottom:0;background:transparent}
+  .act.p0,.act.p1,.act.p2{border-left-color:transparent}
+  .act-h{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+  .act-do{font-size:var(--fs-md);font-weight:500;line-height:1.55}
+  .act-row{font-size:var(--fs-sm);color:var(--text-2);line-height:1.7;margin-top:3px}
+  .act-row b{color:var(--text-3);font-weight:400}
 
   /* ===== 保存状态 ===== */
-  .svdot{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-xs);padding:2px 9px;
-    border-radius:999px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2)}
-  .svdot i{width:6px;height:6px;border-radius:50%;display:block;flex-shrink:0}
+  .svdot{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-xs);padding:0;
+    border-radius:0;border:0;background:none;color:var(--text-3)}
+  .svdot i{width:5px;height:5px;border-radius:50%;display:block;flex-shrink:0}
   .svdot.ok i{background:var(--green)}
-  .svdot.bad{border-color:var(--red-line);background:var(--red-bg);color:var(--red)}
+  .svdot.bad{border:0;background:none;color:var(--red)}
   .svdot.bad i{background:var(--red)}
-  .svdot.warn{border-color:var(--amber-line);background:var(--amber-bg);color:var(--amber)}
+  .svdot.warn{border:0;background:none;color:var(--amber)}
   .svdot.warn i{background:var(--amber)}
   /* 核对清单的空方框：纯 CSS 绘制，不用字符 */
-  .cbx{display:inline-block;width:11px;height:11px;border:1px solid var(--border-strong);
-    border-radius:2px;margin-right:7px;vertical-align:-1px}
+  .cbx{display:inline-block;width:10px;height:10px;border:1px solid var(--border-strong);
+    border-radius:1px;margin-right:7px;vertical-align:-1px}
+
+  /* ===== 多标签页冲突提示 =====
+     只在检测到另一个标签页写过数据时出现。它是真的风险提示
+     （继续操作会覆盖对方），所以给琥珀色边线，但不铺背景。 */
+  .stale{display:flex;align-items:center;gap:14px;
+    padding:10px 24px;border-bottom:1px solid var(--border);
+    border-left:2px solid var(--amber);background:var(--bg);
+    font-size:var(--fs-sm);color:var(--text-2);flex-shrink:0}
+  .stale span{flex:1}
+
+  /* ===== 打印（顶栏「导出」按钮走 window.print）=====
+     页面主体是 height:100vh + 内部 .scroll 滚动容器的布局，
+     不解除这两层限制就只会打印出当前可视的那一屏。 */
+  @media print{
+    html,body{height:auto;overflow:visible;background:#fff}
+    .app{display:block;height:auto;overflow:visible}
+    .side,.topbar,.tabs,.vmenu,.only-narrow{display:none !important}
+    .main{display:block;overflow:visible}
+    .scroll{height:auto;overflow:visible;padding:0}
+    .card,.kpi,.vcard,.chain,.act,.diag,.iss{break-inside:avoid;page-break-inside:avoid}
+    table{font-size:11px}
+    th{position:static}
+    a[href]::after{content:""}
+    /* 折叠的问题卡在纸上默认全展开，否则打印出来只有标题 */
+    .iss-b{display:block !important}
+  }
 </style>
 </head>
 <body>
@@ -459,16 +577,16 @@
     </div>
     <nav class="nav">
       <div class="nav-sec">数据</div>
-      <div class="nav-i on" data-v="import" onclick="go('import')">导入数据</div>
-      <div class="nav-i" data-v="library" onclick="go('library')">场次库<span class="cnt" id="libCnt" style="display:none">0</span></div>
+      <button class="nav-i on" data-v="import" onclick="go('import')">导入数据</button>
+      <button class="nav-i" data-v="library" onclick="go('library')">场次库<span class="cnt" id="libCnt" style="display:none">0</span></button>
       <div class="nav-sec">分析</div>
-      <div class="nav-i" data-v="report" onclick="go('report')">单场诊断<span class="cnt" id="navCnt" style="display:none">0</span></div>
-      <div class="nav-i" data-v="compare" onclick="go('compare')">场次对比</div>
-      <div class="nav-i" data-v="host" onclick="go('host')">主播对比</div>
-      <div class="nav-i" data-v="trend" onclick="go('trend')">趋势看板</div>
+      <button class="nav-i" data-v="report" onclick="go('report')">单场诊断<span class="cnt" id="navCnt" style="display:none">0</span></button>
+      <button class="nav-i" data-v="compare" onclick="go('compare')">场次对比</button>
+      <button class="nav-i" data-v="host" onclick="go('host')">主播对比</button>
+      <button class="nav-i" data-v="trend" onclick="go('trend')">趋势看板</button>
       <div class="nav-sec">管理</div>
-      <div class="nav-i" data-v="issues" onclick="go('issues')">问题库</div>
-      <div class="nav-i" data-v="action" onclick="go('action')">行动清单</div>
+      <button class="nav-i" data-v="issues" onclick="go('issues')">问题库</button>
+      <button class="nav-i" data-v="action" onclick="go('action')">行动清单</button>
     </nav>
     <div class="side-foot">数据全程本地计算<br>不上传服务器</div>
   </aside>
@@ -503,15 +621,12 @@ let ST = {
   M:null, DIAG:null,
   curId:null,          // 当前诊断的场次 id（存入仓库后回填）
   todos:[],
-  history:null,
   // 导入时填写的元信息
   hostName:'未命名主播',
   date:'',
   note:'',
   // 当前对比口径
   compareId:null,      // 场次对比选中的对比对象
-  trendMetric:'gmv',
-  trendRange:14,
   // 每个页面记住自己当前选中的维度板块（子页签）
   tab:{},
   // 导航历史栈：记录「这一步之前在看哪」。
@@ -620,11 +735,14 @@ const SUBTABS = {
     {k:'funnel',   t:'转化漏斗'},
     {k:'traffic',  t:'流量与时段'},
     {k:'product',  t:'商品表现'},
-    {k:'issues',   t:'问题诊断', badge:()=>ST.DIAG?ST.DIAG.issues.length:0, hot:true},
+    // hot 只在「存在 P0」时变红；有 P1/P2 时是灰数字
+    {k:'issues',   t:'问题诊断', badge:()=>ST.DIAG?ST.DIAG.issues.length:0,
+      hot:()=>!!(ST.DIAG && ST.DIAG.issues && ST.DIAG.issues.some(i=>i.sev==='high'))},
     {k:'action',   t:'行动清单', badge:()=>ST.todos.filter(t=>!t.done).length},
   ],
   compare: [
-    {k:'verdict', t:'结论与决策', badge:()=>{ const d=cmpDecide(); return d?d.actions.length:0; }, hot:true},
+    {k:'verdict', t:'结论与决策', badge:()=>{ const d=cmpDecide(); return d?d.actions.length:0; },
+      hot:()=>{ const d=cmpDecide(); return !!(d && d.hard && d.hard.length); }},
     {k:'gap',    t:'差距概览'},
     {k:'detail', t:'指标明细'},
     {k:'trend',  t:'走势对比'},
@@ -639,7 +757,7 @@ const SUBTABS = {
     {k:'table',   t:'指标明细'},
   ],
   issues: [
-    {k:'track', t:'问题追踪', badge:()=>chronicCount(), hot:true},
+    {k:'track', t:'问题追踪', badge:()=>chronicCount(), hot:()=>chronicCount()>0},
     {k:'plan',  t:'整改建议'},
   ],
   action: [
@@ -674,9 +792,17 @@ function renderTabs(){
     if(x.badge){
       let c = 0;
       try{ c = x.badge() || 0; }catch(e){ c = 0; }
-      if(c) n = `<span class="tb-n${x.hot?' hot':''}">${c}</span>`;
+      if(c){
+        // hot 可以是布尔值，也可以是「此刻是否真的紧急」的判断函数。
+        // 用函数是为了让「有 P0 才标红」这种规则随数据变化，而不是写死。
+        let hot = false;
+        try{ hot = (typeof x.hot === 'function') ? !!x.hot() : !!x.hot; }catch(e){ hot = false; }
+        n = `<span class="tb-n${hot?' hot':''}">${c}</span>`;
+      }
     }
-    return `<div class="tab${x.k===cur?' on':''}" onclick="setTab('${x.k}')">${x.t}${n}</div>`;
+    // 页签改用按钮元素：Tab 键可达，屏幕阅读器也会正确念成按钮。
+    // 页签是切换视图的核心控件，只支持鼠标点击是明显的可访问性缺口。
+    return `<button class="tab${x.k===cur?' on':''}" role="tab" aria-selected="${x.k===cur}" onclick="setTab('${x.k}')">${x.t}${n}</button>`;
   }).join('');
 }
 /* 切换维度板块 */
@@ -855,9 +981,25 @@ function loadLatest(){
     M.unknownFields = [...new Set(unk)].filter(Boolean);
     ST.M = M;
     ST.DIAG = runDiagnosis(M);
-    ST.history = STORE.issueTrends();
   } else {
-    ST.M = null; ST.DIAG = null;
+    // 导入的备份可能没有 raw（例如从别处手工拼的 JSON）。
+    // 以前这里把 ST.M 置 null 后仍然返回 true，调用方以为载入成功，
+    // renderReport 直接解构 ST.M.session 就抛 TypeError，整页白屏。
+    // 现在用快照反向构造一个最小 M，让页面能正常显示「只有汇总指标」的视图。
+    ST.M = { session:{}, timeline:[], products:[], sources:[], flags:{}, unknownFields:[], meta:{ category: latest.category } };
+    const sn = latest.snapshot || {};
+    const map = { gmv:'gmv', views:'views', avgStay:'avgStay', entryRate:'entryRate',
+                  cvr:'cvr', refundRate:'refundRate', paidRate:'paidRate', uvValue:'uv' };
+    Object.keys(map).forEach(k=>{
+      const v = sn[map[k]];
+      if(v != null) ST.M.session[k] = v;
+    });
+    ['views','avgStay','gmv','entryRate','cvr'].forEach(k=>{ ST.M.flags[k] = ST.M.session[k]===undefined; });
+    ST.M.flags.hasTimeline = false;
+    ST.M.flags.hasProducts = false;
+    ST.M.flags.hasSources = false;
+    ST.M.noRaw = true;      // 标记：这场没有原文，只能看快照
+    ST.DIAG = runDiagnosis(ST.M);
   }
   ST.curId = latest.id;
   rebuildTodos();   // 必须放在 curId 之后：勾选状态是按「场次 id + 待办文本」查的
@@ -870,15 +1012,26 @@ function loadLatest(){
   return true;
 }
 
-/* 刷新侧栏徽标 */
+/* 刷新侧栏徽标。
+   徽标分两档：纯计数（灰）和「有 P0 硬伤」（红）。
+   以前一律红底，导致「场次库 6」这种中性数字也像告警，
+   真正需要看的时候反而麻木了。 */
 function updateBadges(){
   const n = STORE.count();
   const libC = document.getElementById('libCnt');
-  if(libC){ libC.textContent = n; libC.style.display = n ? '' : 'none'; }
+  if(libC){
+    libC.textContent = n;
+    libC.style.display = n ? '' : 'none';
+    libC.style.color = '';        // 场次数是中性信息，永远是灰
+  }
   const navC = document.getElementById('navCnt');
   if(navC){
-    const c = ST.DIAG ? ST.DIAG.issues.length : 0;
-    navC.textContent = c; navC.style.display = c ? '' : 'none';
+    const issues = (ST.DIAG && ST.DIAG.issues) ? ST.DIAG.issues : [];
+    const p0 = issues.filter(i=>i.sev==='high').length;
+    navC.textContent = issues.length;
+    navC.style.display = issues.length ? '' : 'none';
+    // 只有存在 P0 时才标红；P1/P2 只是灰数字
+    navC.style.color = p0 ? 'var(--red)' : '';
   }
   // 页签上的条数徽标同步刷新（问题数、待办数会随诊断变化）
   if(tabsOf(ST.view).length) renderTabs();
@@ -915,12 +1068,19 @@ function saveBadge(){
   let st;
   try{ st = STORE.saveState(); }catch(e){ return ''; }
   const n = STORE.count();
-  if(st.ok === null && !n){
-    return `<span class="svdot" title="还没有录入任何数据"><i style="background:var(--text-3)"></i>未录入</span>`;
+  // 只读模式（数据损坏 / 结构不认识）：最显眼，且不能让人以为点一下就能好
+  if(st.loadError){
+    return `<span class="svdot bad" style="cursor:pointer" onclick="backupGuide()"
+      title="${esc(st.loadError)}"><i></i>只读 · 数据待抢救</span>`;
   }
-  if(!st.ok){
+  // ok === null 表示「本次会话还没写过」，这不是失败 ——
+  // 以前 !st.ok 把 null 也当失败，于是每天第一次打开页面就红着喊「未存住」。
+  if(st.ok === false){
     return `<span class="svdot bad" style="cursor:pointer" onclick="backupGuide()"
       title="${esc(st.error||'保存失败')}"><i></i>未存住 · 点此备份</span>`;
+  }
+  if(n === 0){
+    return `<span class="svdot" title="还没有录入任何数据"><i style="background:var(--text-3)"></i>未录入</span>`;
   }
   return `<span class="svdot ok" title="已写入本机浏览器存储，关掉网页也不会丢"><i></i>已存本机 ${n} 场</span>`;
 }
@@ -935,8 +1095,7 @@ function envWarn(){
   const btn = has
     ? `<div style="margin-top:8px"><button class="btn sm" onclick="exportLib()">立即导出已录入的 ${hp.count} 场</button></div>`
     : '';
-  return `<div class="note" style="background:var(--red-bg);border:1px solid var(--red-line);
-    color:var(--red);margin-bottom:12px;line-height:1.8">
+  return `<div class="warn" style="margin-bottom:16px">
     <b>注意：这个浏览器存不住数据</b><br>
     原因：${esc(hp.error || '浏览器拒绝了本地存储')}<br>
     也就是说，现在录入的数据在关掉网页后会丢失。常见于：无痕/隐私模式、浏览器禁用了站点数据、存储空间已满。<br>
@@ -977,7 +1136,7 @@ function renderImport(){
   <div class="grid g31">
     <div class="card">
       <div class="ch">
-        <div class="ct">粘贴数据 <span class="tagline">支持竖排 / 横排 / 多表混合</span></div>
+        <div class="ct">粘贴数据</div>
         <div class="cs" id="charCnt">0 字符</div>
       </div>
       <div id="pasteBox">
@@ -992,7 +1151,7 @@ GMV	¥86,420
 时间	在线人数	成交金额	讲解商品
 19:00	820	0	开场
 
-多张表用空行隔开即可，系统会自动分块识别。">${ST.text||''}</textarea>
+多张表用空行隔开即可，系统会自动分块识别。">${esc(ST.text||'')}</textarea>
       </div>
       <div id="fileBox" class="hidden">
         <input type="file" id="fi" accept=".csv,.txt,.tsv" class="inp" style="width:100%">
@@ -1008,8 +1167,8 @@ GMV	¥86,420
       <div class="row mt12 meta-row">
         <span class="muted">场次信息</span>
         <input id="impDate" class="inp" type="date" value="${ST.date||todayStr()}" title="这一场是哪天的直播">
-        <input id="impHost" class="inp" placeholder="主播名（用于主播对比）" value="${ST.hostName&&ST.hostName!=='未命名主播'?ST.hostName:''}" style="width:150px">
-        <input id="impNote" class="inp" placeholder="备注（如：试了新开场 / 换了货盘）" value="${ST.note||''}" style="flex:1;min-width:160px">
+        <input id="impHost" class="inp" placeholder="主播名（用于主播对比）" value="${esc(ST.hostName&&ST.hostName!=='未命名主播'?ST.hostName:'')}" style="width:150px">
+        <input id="impNote" class="inp" placeholder="备注（如：试了新开场 / 换了货盘）" value="${esc(ST.note||'')}" style="flex:1;min-width:160px">
       </div>
       <div class="note" style="font-size:var(--fs-xs);margin-top:8px">
         <b>每天录一场，越用越准</b>：点「开始诊断并存档」，这一场就存进「场次库」，
@@ -1070,6 +1229,14 @@ function bindInput(){
   if(fi){
     fi.addEventListener('change', e=>{
       const f = e.target.files[0]; if(!f) return;
+      // 读之前就拦：等到 FileReader 把 100MB 读进内存再报错，
+      // 卡顿已经发生了。
+      if(f.size > MAX_IMPORT_BYTES){
+        alert('文件太大（' + (f.size/1024/1024).toFixed(1) + ' MB，上限 '
+          + (MAX_IMPORT_BYTES/1024/1024) + ' MB）。\n\n请只保留这一场所需的表格。');
+        e.target.value = '';
+        return;
+      }
       const rd = new FileReader();
       rd.onload = ev => {
         ST.text = ev.target.result;
@@ -1135,19 +1302,52 @@ function seedDemoHistory(){
 }
 
 /* ==================== 分析主流程 ==================== */
+/* 导入体积上限。
+   解析是同步的（splitBlocks → parseDelimited → parseTable → normalize），
+   一次贴进 10MB 文本会把主线程卡死十几秒，页面看起来像崩了。
+   2MB 已经远超一场直播的真实数据量（示例数据不到 1KB），
+   超过就拒绝并给出明确原因，而不是让用户对着冻住的页面猜。 */
+const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
+
 function analyze(){
   const t = (ST.text||'').trim();
   if(!t){ alert('请先粘贴数据，或点「载入示例数据」'); return; }
+  if(t.length > MAX_IMPORT_BYTES){
+    alert('粘贴的数据太大（约 ' + (t.length/1024/1024).toFixed(1) + ' MB），已停止解析。\n\n'
+      + '单场直播的复盘数据通常只有几十 KB。请检查是否误贴了整月报表，\n'
+      + '或只保留这一场所需的那几张表。');
+    return;
+  }
   ST.cat = document.getElementById('cat') ? document.getElementById('cat').value : ST.cat;
 
   const blocks = splitBlocks(t);
-  let recs=[], unk=[];
+  let recs=[], unk=[], clamped=[];
   blocks.forEach(b=>{
     const p = parseTable(parseDelimited(b));
     recs = recs.concat(p.records); unk = unk.concat(p.unknown||[]);
+    if(p.clamped && p.clamped.length) clamped = clamped.concat(p.clamped);
   });
   const M = normalize(recs, {category:ST.cat});
   M.unknownFields = [...new Set(unk)].filter(Boolean);
+
+  // 一个指标都没读到就拒绝存档。
+  // 以前这里只检查文本非空，于是粘一段普通文字也能「成功存档」，
+  // 场次库里多出一条 GMV ¥0 / 健康分 96 的幽灵记录。
+  // 注意口径必须与 runDiagnosis 一致：分时段表 / 商品表 / 流量来源表
+  // 也是有效数据，只上传一张分时段表时不该被拒绝。
+  const METRIC_KEYS = ['views','gmv','avgStay','entryRate','cvr','refundRate','paidRate','uvValue'];
+  const gotMetric = METRIC_KEYS.filter(k=>M.session[k]!=null);
+  const gotDetail = M.timeline.length > 0 || M.products.length > 0 || M.sources.length > 0;
+  if(!gotMetric.length && !gotDetail){
+    const unknown = M.unknownFields.slice(0,6).join('、');
+    alert('没有识别到任何可用的指标，这次没有存档。\n\n'
+      + '至少需要一项汇总指标（观看人数 / GMV / 平均停留 / 进入率 / 成交转化率 / 退款率 / 付费占比），\n'
+      + '或一张明细表（分时段 / 商品 / 流量来源，需要表头行）。\n'
+      + (unknown ? '\n未能识别的列：' + unknown + '\n' : '')
+      + '\n请确认粘贴内容包含表头行（如「观看人数」「GMV」），数值在表头下一行或右侧。');
+    return;
+  }
+
   const DIAG = runDiagnosis(M);
   ST.M = M; ST.DIAG = DIAG;
   // 待办等本场 id 落地后再重建（见下方 rebuildTodos）——
@@ -1165,18 +1365,21 @@ function analyze(){
   });
   ST.curId = res.record.id;
   rebuildTodos();     // 本场 id 已确定，按它恢复勾选状态与手动加入的动作
-  ST.history = STORE.issueTrends();
 
   // 存档回执：明确告诉用户「这一场记下来了没有、记成第几场」
   // 过去这里没有反馈，用户不知道数据到底存没存住 —— 这是「昨天数据没了」的直接来源
   // 重复导入时会切到「已存在的那一场」，所以回执必须说清切到哪一场，
   // 否则用户会以为「我刚导入的数据怎么变成旧场次的结论了」。
+  const clampTxt = clamped.length
+    ? ' 其中 ' + clamped.length + ' 个超出合理范围的数值已按物理上限修正（如 '
+      + clamped[0].field + ' ' + clamped[0].from + '→' + clamped[0].to + '），请核对原始数据。'
+    : '';
   ST.saveNote = res.dup
     ? {k:'dup', txt:'这份数据和已存的第 '+(res.record.seq||'?')+' 场（'+res.record.date
         +' · '+res.record.hostName+'）完全一致，没有重复记录（避免同一天录两遍把均值拉偏）。'
         +'已切到那一场，下面的对比和结论都是按它算的。'}
     : (res.saved
-        ? {k:'ok', txt:'已记录为第 ' + STORE.count() + ' 场（' + res.record.date + ' · ' + res.record.hostName + '）。下次导入会自动和这一场对比。'}
+        ? {k:'ok', txt:'已记录为第 ' + STORE.count() + ' 场（' + res.record.date + ' · ' + res.record.hostName + '）。下次导入会自动和这一场对比。' + clampTxt}
         : {k:'bad', txt:'已记到内存，但没能写进本机存储——关掉网页会丢。请立即导出备份。'});
   updateBadges();
 
@@ -1212,7 +1415,19 @@ function splitBlocks(text){
 /* ==================== 单场诊断（按维度分板块） ==================== */
 /* 一次只渲染当前选中的维度板块，避免一条长页滚到底 */
 function renderReport(){
-  const M = ST.M, D = ST.DIAG, s = M.session;
+  const M = ST.M, D = ST.DIAG;
+  // M 为空说明还没载入任何场次（例如库里只有缺 raw 的导入记录）。
+  // 直接解构 M.session 会抛 TypeError 白屏，这里提前挡掉。
+  if(!M || !D){
+    document.getElementById('scroll').innerHTML =
+      `<div class="card"><div class="empty-lib">
+        <div style="font-size:var(--fs-lg);color:var(--text-2);margin-bottom:6px">还没有可诊断的场次</div>
+        <div style="font-size:var(--fs-sm);line-height:1.7">导入一场数据，或从「场次库」点某一场的「诊断」。</div>
+        <div class="mt12"><button class="btn pri" onclick="go('import')">去导入</button></div>
+      </div></div>`;
+    return;
+  }
+  const s = M.session || {};
   if(!Object.keys(s).length){
     document.getElementById('scroll').innerHTML =
       `<div class="warn"><b>没有识别到有效数据。</b>请确认粘贴内容包含表头行（如「观看人数」「GMV」），且数值在表头下一行或右侧。</div>`;
@@ -1257,23 +1472,27 @@ function dimCard(tabKey, title, lines){
 /* ---------- 板块 1：总览 ---------- */
 function repOverview(M, D, s){
   const B = benchOf(ST.cat);
-  // 先给存档回执（这场存住了吗），再给裁决（这场该怎么办）
+  // 顺序：存档回执 → 裁决 → 四个读数 → 结论列表 → 指标表
   let h = saveNoteBar();
   h += verdictBar();
   h += `<div class="grid g4 mt12">
-    ${kpi('GMV','¥'+(s.gmv||0).toLocaleString(), s.gmv, null, 'red')}
-    ${kpi('UV 价值','¥'+fmt(s.uvValue), s.uvValue, B.uvValue, 'blue')}
-    ${kpi('平均停留', (s.avgStay!=null?s.avgStay+'s':'—'), s.avgStay, B.stay, 'amber')}
-    ${kpi('退款率', (s.refundRate!=null?s.refundRate+'%':'—'), s.refundRate, B.refundRate, 'purple', true)}
+    ${kpi('GMV','¥'+(s.gmv||0).toLocaleString(), s.gmv, null)}
+    ${kpi('UV 价值','¥'+fmt(s.uvValue), s.uvValue, B.uvValue)}
+    ${kpi('平均停留', (s.avgStay!=null?s.avgStay+'s':'—'), s.avgStay, B.stay)}
+    ${kpi('退款率', (s.refundRate!=null?s.refundRate+'%':'—'), s.refundRate, B.refundRate, true)}
   </div>`;
 
+  // 健康分和结论并排：健康分只要数字 + 一句问题计数，不要圆环外的三行注解
+  const p0 = D.issues.filter(i=>i.sev==='high').length;
+  const p1 = D.issues.filter(i=>i.sev==='mid').length;
   h += `<div class="grid g12">
     <div class="card">
       <div class="ch"><div class="ct">健康分</div></div>
       ${scoreRing(D.score)}
-      <div class="mt12" style="font-size:var(--fs-sm);color:var(--text-2);line-height:1.6">
-        ${D.issues.length ? `检出 <b style="color:var(--red)">${D.issues.filter(i=>i.sev==='high').length}</b> 项严重问题 ·
-          <b style="color:var(--amber)">${D.issues.filter(i=>i.sev==='mid').length}</b> 项需关注` : '各项指标正常'}
+      <div class="mt8" style="font-size:var(--fs-xs);color:var(--text-3);line-height:1.6">
+        ${D.issues.length
+          ? `P0 ${p0} 项 · P1 ${p1} 项 · 共 ${D.issues.length} 项`
+          : '未检出问题'}
       </div>
     </div>
 
@@ -1286,14 +1505,14 @@ function repOverview(M, D, s){
         <div class="diag">
           <div class="dsev ${it.sev}"></div>
           <div class="dbody">
-            <div class="dtxt">${it.title}</div>
+            <div class="dtxt">${esc(it.title)}</div>
             <div class="dmeta">
-              <span class="badge ${it.sev==='high'?'b-red':it.sev==='mid'?'b-amber':'b-blue'}">${it.sev==='high'?'P0':it.sev==='mid'?'P1':'P2'}</span>
-              <span>${it.meta}</span>
+              <span class="badge ${it.sev==='high'?'b-red':it.sev==='mid'?'b-amber':'b-gray'}">${it.sev==='high'?'P0':it.sev==='mid'?'P1':'P2'}</span>
+              <span>${esc(it.meta)}</span>
             </div>
           </div>
-          <div class="dnum">${shortNum(it)}</div>
-        </div>`).join('') || '<div class="empty">未检出明显问题</div>'}
+          <div class="dnum">${esc(shortNum(it))}</div>
+        </div>`).join('') || '<div class="empty" style="padding:20px 0;text-align:left">未检出明显问题</div>'}
       ${D.issues.length>5?`<div class="mt8" style="text-align:right">
         <button class="btn sm" onclick="setTab('issues')">查看全部 ${D.issues.length} 项 →</button></div>`:''}
     </div>
@@ -1311,7 +1530,8 @@ function repOverview(M, D, s){
     ['付费流量占比', s.paidRate, null, '%'],
   ];
   h += `<div class="grid g21">`;
-  h += `<div class="card"><div class="ch"><div class="ct">关键指标 <span class="tagline">vs 类目基准</span></div></div>
+  h += `<div class="card"><div class="ch"><div class="ct">关键指标</div>
+      <div class="cs">差值为相对类目基准</div></div>
     <div class="tb-wrap"><table><tbody>`;
   rows2.forEach(([k,v,b,p])=>{
     if(v==null) return;
@@ -1335,8 +1555,8 @@ function repOverview(M, D, s){
 
   /* 维度导航：点着看，不用滚 */
   h += `<div class="ch" style="margin:6px 0 10px">
-    <div class="ct">按维度深入 <span class="tagline">点任意板块进入</span></div>
-    <div class="cs">共 5 个分析维度</div></div>`;
+    <div class="ct">按维度深入</div>
+    <div class="cs">共 ${D.analyses.RF ? 6 : 5} 个分析维度</div></div>`;
   h += repDimNav(M, D, s);
 
   return h;
@@ -1426,42 +1646,40 @@ function repDimNav(M, D, s){
 /* ---------- 板块 2：转化漏斗 ---------- */
 function repFunnel(M, D, s){
   const B = benchOf(ST.cat);
-  let h = `<div class="grid g21">
+  const steps = repFunnelSteps(M, s, B);
+  // 3:2 —— 漏斗比因子拆解需要更多横向空间（条要够长才看得出差距）。
+  // 「各环节 vs 基准」并进左栏：它和漏斗是同一份数据的两种看法，
+  // 拆成独立一行会让左栏底部空出一大截。
+  let h = `<div class="grid" style="grid-template-columns:3fr 2fr">
     <div class="card">
-      <div class="ch"><div class="ct">转化漏斗 <span class="tagline">标出断点环节</span></div>
-        <div class="cs">数值为该环节规模</div></div>
+      <div class="ch"><div class="ct">转化漏斗</div>
+        <div class="cs">条宽 = 该环节规模 · 红色 = 断点</div></div>
       ${renderFunnelHTML(M, D, B)}
+      ${steps.length ? `
+        <div class="ch" style="margin:20px 0 8px"><div class="ct">各环节 vs 基准</div>
+          <div class="cs">差距 = 本场 − 基准（pp 为百分点）</div></div>
+        <div class="tb-wrap"><table><thead><tr>
+          <th>环节</th><th class="num">本场</th><th class="num">类目基准</th><th style="text-align:right">差距</th>
+        </tr></thead><tbody>
+        ${steps.map(([n,v,b,unit])=>{
+          let gap='';
+          if(v!=null && b!=null){
+            const d = v-b;
+            const good = d>0;
+            gap = `<span class="${Math.abs(d)<0.3?'flat':(good?'down':'up')}">${d>0?'+':'−'}${Math.abs(d).toFixed(1)}${unit==='pp'?'pp':''}</span>`;
+          } else gap = '<span class="flat">—</span>';
+          return `<tr><td>${n}</td>
+            <td class="num" style="font-weight:600">${v==null?'—':(unit==='pp'?v+'%':v)}</td>
+            <td class="num" style="color:var(--text-3)">${b==null?'—':(unit==='pp'?b+'%':b)}</td>
+            <td style="text-align:right">${gap}</td></tr>`;
+        }).join('')}
+        </tbody></table></div>` : ''}
     </div>
     <div class="card">
-      <div class="ct mb8">GMV 三因子拆解</div>
+      <div class="ch"><div class="ct">GMV 三因子拆解</div></div>
       ${repGmvFactors(M, s, B)}
     </div>
   </div>`;
-
-  /* 漏斗全环节明细 */
-  const steps = repFunnelSteps(M, s, B);
-  if(steps.length){
-    h += `<div class="card mt12">
-      <div class="ch"><div class="ct">各环节 vs 基准</div>
-        <div class="cs">差距 = 本场 − 基准（pp 为百分点）</div></div>
-      <div class="tb-wrap"><table><thead><tr>
-        <th>环节</th><th class="num">本场</th><th class="num">类目基准</th><th style="text-align:right">差距</th>
-      </tr></thead><tbody>
-      ${steps.map(([n,v,b,unit])=>{
-        let gap='';
-        if(v!=null && b!=null){
-          const d = v-b;
-          const good = d>0;
-          gap = `<span class="${Math.abs(d)<0.3?'flat':(good?'down':'up')}">${d>0?'+':'−'}${Math.abs(d).toFixed(1)}${unit==='pp'?'pp':''}</span>`;
-        } else gap = '<span class="flat">—</span>';
-        return `<tr><td>${n}</td>
-          <td class="num" style="font-weight:600">${v==null?'—':(unit==='pp'?v+'%':v)}</td>
-          <td class="num" style="color:var(--text-3)">${b==null?'—':(unit==='pp'?b+'%':b)}</td>
-          <td style="text-align:right">${gap}</td></tr>`;
-      }).join('')}
-      </tbody></table></div>
-    </div>`;
-  }
   return h;
 }
 
@@ -1528,15 +1746,16 @@ function repTraffic(M, D, s){
   const B = benchOf(ST.cat);
   let h = '';
 
-  /* 流量来源 + 结构解读 */
-  h += `<div class="grid g21">
+  /* 流量来源 + 结构解读。
+     比例用 g31（3:1）：表格本身列不多，给 2 份宽度会留下大片空白。 */
+  h += `<div class="grid g31">
     <div class="card">
-      <div class="ch"><div class="ct">流量来源 <span class="tagline">占比 vs 进入率</span></div>
-        <div class="cs">${SRC?SRC.list.length+' 个渠道':'—'}</div></div>
+      <div class="ch"><div class="ct">流量来源</div>
+        <div class="cs">${SRC?SRC.list.length+' 个渠道 · 占比 vs 进入率':'—'}</div></div>
       ${SRC ? renderSourceTable(SRC) : '<div class="empty">无流量来源数据<br><span style="font-size:var(--fs-xs)">补充「渠道名 + 人数 + 进入率」后可生成</span></div>'}
     </div>
     <div class="card">
-      <div class="ct mb8">流量结构解读</div>
+      <div class="ch"><div class="ct">结构解读</div></div>
       ${repSourceInsight(M, s, SRC, B)}
     </div>
   </div>`;
@@ -1545,37 +1764,38 @@ function repTraffic(M, D, s){
   if(M.flags.hasTimeline && A){
     h += `<div class="card mt12">
       <div class="ch">
-        <div class="ct">时段热力 <span class="tagline">柱高=在线人数 · 颜色=成交效率</span></div>
+        <div class="ct">时段热力</div>
         <div class="cs">效率系数 = 成交占比 ÷ 流量占比</div>
       </div>
       ${renderHeat(A)}
-      <div class="row mt12" style="gap:16px">
-        <span class="muted"><span style="display:inline-block;width:9px;height:9px;background:var(--green);border-radius:2px;vertical-align:-1px"></span> 高效 系数&gt;1.5</span>
-        <span class="muted"><span style="display:inline-block;width:9px;height:9px;background:var(--amber);border-radius:2px;vertical-align:-1px"></span> 一般 0.6–1.5</span>
-        <span class="muted"><span style="display:inline-block;width:9px;height:9px;background:var(--red);border-radius:2px;vertical-align:-1px"></span> 低效 系数&lt;0.6</span>
+      <div class="row mt12" style="gap:20px">
+        <span class="cs"><span style="display:inline-block;width:10px;height:2px;background:var(--green);vertical-align:3px;margin-right:6px"></span>高效 &gt;1.5</span>
+        <span class="cs"><span style="display:inline-block;width:10px;height:2px;background:var(--border-strong);vertical-align:3px;margin-right:6px"></span>一般 0.6–1.5</span>
+        <span class="cs"><span style="display:inline-block;width:10px;height:2px;background:var(--red);vertical-align:3px;margin-right:6px"></span>低效 &lt;0.6（整柱标红）</span>
+        <span class="cs" style="margin-left:auto">柱高 = 在线人数</span>
       </div>
     </div>`;
 
     /* 高效 / 低效时段排名 */
     h += `<div class="grid g2 mt12">
       <div class="card">
-        <div class="ch"><div class="ct">最高效时段 <span class="tagline">加预算</span></div></div>
+        <div class="ch"><div class="ct">最高效时段</div></div>
         ${repSlotRank(A, 'best')}
       </div>
       <div class="card">
-        <div class="ch"><div class="ct">最低效时段 <span class="tagline">压缩或换品</span></div></div>
+        <div class="ch"><div class="ct">最低效时段</div></div>
         ${repSlotRank(A, 'worst')}
       </div>
     </div>`;
 
     /* 走势折线 */
     h += `<div class="card mt12">
-      <div class="ch"><div class="ct">流量与成交走势 <span class="tagline">自动标注拐点</span></div></div>
+      <div class="ch"><div class="ct">流量与成交走势</div></div>
       <div class="lg">
-        <span><i style="background:#185FA5"></i>在线人数</span>
-        <span><i style="background:#B93A2C"></i>成交金额</span>
+        <span><i style="background:var(--ch-1)"></i>在线人数</span>
+        <span><i style="background:var(--ch-3)"></i>成交金额</span>
       </div>
-      <div class="chart"><canvas id="cv"></canvas></div>
+      <div class="chart"><canvas id="cv" role="img" aria-label="流量与成交走势图：横轴为时段，纵轴为在线人数（左）与成交金额（右），并标注峰值、骤降、起量三类拐点。具体数值见上方时段热力与时段排名表。"></canvas></div>
     </div>`;
   } else {
     h += `<div class="warn mt12"><b>没有分时段数据</b>：时段热力、时段效率排名与拐点定位都需要按时间排列的明细（如「时间 + 在线人数 + 成交金额」）。</div>`;
@@ -1605,7 +1825,7 @@ function repSourceInsight(M, s, SRC, B){
         : natural < 30
         ? `自然流量占比 ${natural.toFixed(0)}% 偏低，长期获客成本会走高。优先优化短视频引流与开播时段。`
         : `<b>流量结构健康</b>：付费 ${paid.toFixed(0)}% / 自然 ${natural.toFixed(0)}%，有自然流量托底，投放可以更从容。`}
-      ${SRC.list.length?`<br>最大来源是 <b>${SRC.list[0].name}</b>（${SRC.list[0].share.toFixed(0)}%），进入率 ${SRC.list[0].entry!=null?SRC.list[0].entry+'%':'未提供'}。`:''}
+      ${SRC.list.length?`<br>最大来源是 <b>${esc(SRC.list[0].name)}</b>（${SRC.list[0].share.toFixed(0)}%），进入率 ${SRC.list[0].entry!=null?SRC.list[0].entry+'%':'未提供'}。`:''}
     </div>
   </div>`;
 }
@@ -1644,7 +1864,7 @@ function repProduct(M, D){
 
   h += `<div class="grid g21">
     <div class="card">
-      <div class="ch"><div class="ct">商品四象限 <span class="tagline">横=讲解段数 · 纵=转化率</span></div>
+      <div class="ch"><div class="ct">商品四象限</div>
         <div class="cs">${PQ.list.length} 款</div></div>
       ${renderQuad(PQ)}
     </div>
@@ -1706,8 +1926,7 @@ function repProductPlan(PQ){
   h += block('低效 · 换品', weak, 'var(--amber)', '讲得少也卖不动，考虑替换或改价，不要再占排期。');
   if(!h) h = '<div class="empty">商品数据不足以给出策略</div>';
 
-  h += `<div class="note mt8" style="font-size:var(--fs-xs)">
-    本场平均转化率 ${PQ.avgCvr!=null?PQ.avgCvr+'%':'—'} · 平均讲解 ${PQ.avgSeg!=null?PQ.avgSeg+' 段':'—'}</div>`;
+  // 平均转化/平均讲解由四象限下方统一输出一次，这里不再重复
   return h;
 }
 
@@ -1734,7 +1953,7 @@ function repIssues(D){
   </div>`;
 
   h += `<div class="card mt12">
-    <div class="ch"><div class="ct">完整诊断 <span class="tagline">含证据链与执行方案</span></div>
+    <div class="ch"><div class="ct">完整诊断</div>
       <div class="cs">${D.issues.length} 项 · 点标题展开</div></div>
     <div id="issList">${D.issues.map((it,i)=>renderIssueCard(it,i)).join('') || '<div class="empty">未检出问题</div>'}</div>
   </div>`;
@@ -1743,6 +1962,19 @@ function repIssues(D){
     每条问题都给出「证据 → 归因 → 动作」三段。证据是具体数字，归因解释为什么，动作写明下场怎么改。
     想按 P0/P1 排优先级执行，去「行动清单」板块。
   </div>`;
+  // 展开/收起用事件委托。以前是内联 onclick="getElementById('issN')"，
+  // 依赖字符串拼 id；现在只查最近的 .iss，不依赖 id 也不引入注入面。
+  requestAnimationFrame(()=>{
+    const box = document.getElementById('issList');
+    if(!box || box.dataset.bound) return;
+    box.dataset.bound = '1';
+    box.addEventListener('click', e=>{
+      const head = e.target.closest('.iss-h');
+      if(!head) return;
+      const card = head.closest('.iss');
+      if(card) card.classList.toggle('open');
+    });
+  });
   return h;
 }
 
@@ -1764,8 +1996,7 @@ function repActionSec(){
     <div class="kpi"><div class="kpi-l">已完成</div>
       <div class="kpi-v" style="color:var(--green)">${doneCnt}<small> 项</small></div></div>
     <div class="kpi"><div class="kpi-l">完成率</div>
-      <div class="kpi-v">${todos.length?Math.round(doneCnt/todos.length*100):0}<small>%</small></div>
-      <div class="kpi-bar"><i style="width:${todos.length?doneCnt/todos.length*100:0}%;background:var(--green)"></i></div></div>
+      <div class="kpi-v">${todos.length?Math.round(doneCnt/todos.length*100):0}<small>%</small></div></div>
   </div>`;
 
   h += `<div class="grid g21 mt12">
@@ -1789,10 +2020,7 @@ function repActionSec(){
         <div class="ct mb8">下场验证清单</div>
         <div class="note" style="font-size:var(--fs-xs)">
           下场直播结束后，回看这些指标是否改善：<br><br>
-          <span class="cbx"></span>平均停留 是否回到 55 秒以上<br>
-          <span class="cbx"></span>退款率 是否降到 8% 以下<br>
-          <span class="cbx"></span>低效品讲解次数 是否已压缩<br>
-          <span class="cbx"></span>UV 价值 是否回升
+          ${verifyChecklist().map(t=>`<span class="cbx"></span>${esc(t)}`).join('<br>')}
         </div>
       </div>
     </div>
@@ -1800,30 +2028,40 @@ function repActionSec(){
   return h;
 }
 
-/* ---- KPI ---- */
-function kpi(label, val, raw, base, ramp, inverse){
+/* 下场验证清单：阈值取自当前品类的基准，而不是写死 55 秒 / 8% ——
+   家居类目停留基准 61s、日用 42s、家居退款基准 6.1%，
+   写死一个数字会让三个类目的用户都看到错的对照值。 */
+function verifyChecklist(){
+  const B = benchOf(ST.cat) || benchOf('通用');
+  const stay = B.stay != null ? B.stay : 55;
+  const refund = B.refundRate != null ? B.refundRate : 8;
+  return [
+    `平均停留 是否回到 ${stay} 秒以上`,
+    `退款率 是否降到 ${refund}% 以下`,
+    '低效品讲解次数 是否已压缩',
+    'UV 价值 是否回升',
+  ];
+}
+/* 指标读数。ramp / inverse 说明：
+   ramp 曾经用来选装饰条的色，横条已移除，参数一并删掉；
+   inverse 仍然有用（退款率越低越好，着色方向要反过来）。 */
+function kpi(label, val, raw, base, inverse){
   let d = '';
   if(raw!=null && base!=null){
     const gap = (raw-base)/base*100;
     const good = inverse ? gap<0 : gap>0;
     const cls = Math.abs(gap)<3 ? 'flat' : (good?'down':'up');
     d = `<span class="${cls}">${gap>0?'+':'−'}${Math.abs(gap).toFixed(1)}%</span>
-         <span class="muted">基准 ${base}${label.includes('率')||label.includes('占比')?'%':''}</span>`;
+         <span style="color:var(--text-3)">基准 ${base}${label.includes('率')||label.includes('占比')?'%':''}</span>`;
   } else if(raw!=null){
-    d = `<span class="muted">基准 ${base==null?'—':base}</span>`;
+    d = `<span style="color:var(--text-3)">基准 —</span>`;
   } else {
-    d = `<span class="muted">未提供</span>`;
-  }
-  const barColor = {red:'var(--red)',blue:'var(--blue)',amber:'var(--amber)',purple:'var(--purple)'}[ramp];
-  let w = 100;
-  if(raw!=null && base!=null){
-    w = Math.min(100, Math.max(8, inverse ? (base/raw*50) : (raw/base*50)));
+    d = `<span style="color:var(--text-3)">未提供</span>`;
   }
   return `<div class="kpi">
     <div class="kpi-l">${label}</div>
     <div class="kpi-v">${val}</div>
     <div class="kpi-d">${d}</div>
-    <div class="kpi-bar"><i style="width:${w}%;background:${barColor}"></i></div>
   </div>`;
 }
 function fmt(v){ return v==null?'—':(typeof v==='number'?v.toLocaleString():v); }
@@ -1833,41 +2071,48 @@ function shortNum(it){
   return String(e[1]).split('（')[0];
 }
 
-/* ---- 健康分环 ---- */
+/* ---- 健康分 ----
+   只保留一个数字 + 一条细弧。原来环里环外三行注解（扣分规则、范围、不追求满分）
+   属于「解释评分系统」，不是读数，移到指标明细里说明一次就够了。 */
 function scoreRing(score){
-  const r=40, c=2*Math.PI*r;
+  if(score == null){
+    return `<div class="score-hero"><div><b style="font-size:20px;font-weight:600;color:var(--text-3)">—</b>
+      <div style="font-size:var(--fs-xs);color:var(--text-3);margin-top:2px">数据不足，未评分</div></div></div>`;
+  }
+  const r=28, c=2*Math.PI*r;
   const pct = Math.max(0, Math.min(100, score))/100;
-  const col = score>=85?'#22684A':score>=70?'#185FA5':score>=55?'#8F6410':'#B93A2C';
+  const col = score>=85?'var(--green)':score>=70?'var(--text)':score>=55?'var(--amber)':'var(--red)';
+  // 轨道色要明显深于页面底色，否则低分时只剩一小截彩色弧悬在空中，
+  // 看不出「这是 100 分中的 28 分」这个比例关系。
   return `<div class="score-hero">
     <div class="ring">
-      <svg width="96" height="96" viewBox="0 0 96 96">
-        <circle cx="48" cy="48" r="${r}" fill="none" stroke="#E5E5E0" stroke-width="8"/>
-        <circle cx="48" cy="48" r="${r}" fill="none" stroke="${col}" stroke-width="8"
-          stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-pct)}"
-          transform="rotate(-90 48 48)"/>
+      <svg width="68" height="68" viewBox="0 0 68 68">
+        <circle cx="34" cy="34" r="${r}" fill="none" stroke="#DDDDD7" stroke-width="4"/>
+        <circle cx="34" cy="34" r="${r}" fill="none" stroke="${col}" stroke-width="4"
+          stroke-linecap="butt" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-pct)}"
+          transform="rotate(-90 34 34)"/>
       </svg>
-      <div class="ring-num"><b style="color:${col}">${score}</b><span>/ 100</span></div>
-    </div>
-    <div style="font-size:var(--fs-sm);color:var(--text-2);line-height:1.7">
-      <div>评分基于 <b>${ST.DIAG.issues.length}</b> 项检出问题加权扣分</div>
-      <div class="muted mt8">P0 扣 14 · P1 扣 7 · P2 扣 3</div>
-      <div class="muted">范围 28–96，不追求满分</div>
+      <div class="ring-num"><b style="color:${col}">${score}</b></div>
     </div>
   </div>`;
 }
 
-/* ---- 漏斗 ---- */
+/* ---- 漏斗 ----
+   条的颜色只用灰阶和红：灰=正常环节，红=断点。
+   以前四级蓝色渐变是纯装饰 —— 深浅不承载任何信息，只会让人以为
+   「浅色=少、深色=多」，而实际含义只是「第几步」。 */
 function renderFunnelHTML(M, D, B){
   const s = M.session;
   const steps = [];
-  if(s.exposure!=null) steps.push({n:'曝光',v:s.exposure,r:null,b:null,c:'#A8C8E4'});
+  const C_OK = '#C4C4BE', C_LAST = CHART_COLORS.secondary;
+  if(s.exposure!=null) steps.push({n:'曝光',v:s.exposure,r:null,b:null,c:C_OK});
   if(s.views!=null){
     const r = s.exposure ? s.views/s.exposure*100 : (s.entryRate!=null?s.entryRate:null);
-    steps.push({n:'进入直播间',v:s.views,r:r!=null?+r.toFixed(1):null,b:B.entryRate,c:'#7AACD8'});
+    steps.push({n:'进入直播间',v:s.views,r:r!=null?+r.toFixed(1):null,b:B.entryRate,c:C_OK});
   }
-  if(s.orders!=null) steps.push({n:'下单支付',v:s.orders,r:s.cvr!=null?s.cvr:null,b:B.cvr,c:'#4A85C0'});
+  if(s.orders!=null) steps.push({n:'下单支付',v:s.orders,r:s.cvr!=null?s.cvr:null,b:B.cvr,c:C_LAST});
   if(s.buyers!=null && s.orders && s.buyers!==s.orders)
-    steps.push({n:'成交人数',v:s.buyers,r:null,b:null,c:'#1E6BAE'});
+    steps.push({n:'成交人数',v:s.buyers,r:null,b:null,c:C_LAST});
   if(steps.length<2) return '<div class="empty">数据不足，无法绘制漏斗</div>';
 
   let wi=-1, wg=0;
@@ -1877,6 +2122,8 @@ function renderFunnelHTML(M, D, B){
       if(g<wg){ wg=g; wi=i; }
     }
   });
+  // 断点那一环条用红色，其余保持灰
+  if(wi>=0) steps[wi].c = 'var(--red)';
   const max = steps[0].v;
   let h = '<div class="fun">';
   steps.forEach((st,i)=>{
@@ -1905,23 +2152,26 @@ function renderFunnelHTML(M, D, B){
 }
 
 /* ---- 时段热力 ---- */
+/* ---- 时段热力图 ----
+   以前每根柱子按效率整根填充红/黄/绿：一屏 24 个大色块，
+   看久了什么都记不住，而且「全部一般」时画面一片黄，等于没有信号。
+   现在：柱高 = 在线人数（灰色，这是形状信息），
+   效率只在柱底一条 3px 的细带和「低效」那一根上体现颜色。
+   颜色的面积从 100% 降到 3%，异常才会跳出来。 */
 function renderHeat(A){
   const slots = A.slots;
   const maxOn = Math.max(...slots.map(s=>s.online||0), 1);
-  const effs = slots.map(s=>s.efficiency).filter(e=>e>0);
-  const maxE = effs.length ? Math.max(...effs) : 1;
   let h = '<div class="heat">';
   slots.forEach(s=>{
     const hpct = (s.online||0)/maxOn;
     const e = s.efficiency;
-    let col = 'var(--surface-3)';
-    if(e>0){
-      if(e>1.5) col='var(--green)';
-      else if(e>=0.6) col='var(--amber)';
-      else col='var(--red)';
-    }
-    h += `<div class="hbar" style="height:${Math.max(hpct*100,4)}%;background:${col}"
-      title="${s.label}｜在线 ${s.online||0}｜成交 ¥${s.gmv||0}｜效率 ${e.toFixed(2)}${s.item?'｜'+s.item:''}"></div>`;
+    // 只有「低效」才给整根柱子染色；高效和一般都保持灰底 + 细带
+    const low = e > 0 && e < 0.6;
+    const barCol = low ? 'var(--red)' : '#C9C9C3';
+    const bandCol = e<=0 ? 'transparent' : (e>1.5 ? 'var(--green)' : (e>=0.6 ? 'var(--border-strong)' : 'var(--red)'));
+    h += `<div class="hbar" style="height:${Math.max(hpct*100,4)}%;background:${barCol}"
+      title="${s.label}｜在线 ${s.online||0}｜成交 ¥${s.gmv||0}｜效率 ${e.toFixed(2)}${s.item?'｜'+s.item:''}">
+      <i style="background:${bandCol}"></i></div>`;
   });
   h += '</div><div class="heat-x">';
   const step = Math.max(1, Math.ceil(slots.length/8));
@@ -1930,7 +2180,10 @@ function renderHeat(A){
   return h;
 }
 
-/* ---- 商品四象限 ---- */
+/* ---- 商品四象限 ----
+   以前四个象限名贴在四角、商品名贴在点旁边，点一多就互相压住。
+   现在象限名作为水印放在每个象限中央（浅灰、不可交互），
+   商品名改成悬停才出现 —— 常态下只留点，图才读得清。 */
 function renderQuad(PQ){
   const list = PQ.list.filter(p=>p.cvr!=null && p.segs!=null);
   if(list.length<2) return '<div class="empty">商品数据不足以绘制四象限<br><span style="font-size:var(--fs-xs)">需要「讲解段数 + 转化率」</span></div>';
@@ -1938,32 +2191,30 @@ function renderQuad(PQ){
   const maxCvr = Math.max(...list.map(p=>p.cvr))*1.25 || 1;
   const avgCvr = PQ.avgCvr || 0;
   const avgSeg = PQ.avgSeg || 0;
+  const xLine = (avgSeg/maxSeg*100).toFixed(1);
+  const yLine = ((1-avgCvr/maxCvr)*100).toFixed(1);
 
   let h = `<div class="quad">
-    <div class="qd" style="top:-14px;left:0">高转化</div>
+    <div class="qd" style="top:-16px;left:0">高转化</div>
     <div class="qd" style="bottom:-20px;right:0">讲解段数 →</div>
-    <div style="position:absolute;left:0;right:0;top:${(1-avgCvr/maxCvr)*100}%;
+    <div style="position:absolute;left:0;right:0;top:${yLine}%;
       border-top:1px dashed var(--border-strong)"></div>
-    <div style="position:absolute;top:0;bottom:0;left:${avgSeg/maxSeg*100}%;
+    <div style="position:absolute;top:0;bottom:0;left:${xLine}%;
       border-left:1px dashed var(--border-strong)"></div>
-    <div class="qd" style="top:4px;right:4px;color:var(--green);font-weight:600">明星品 · 加大</div>
-    <div class="qd" style="top:4px;left:4px;color:var(--amber);font-weight:600">潜力品 · 增加曝光</div>
-    <div class="qd" style="bottom:4px;left:4px;color:var(--red);font-weight:600">低效品 · 压缩</div>
-    <div class="qd" style="bottom:4px;right:4px;color:var(--text-3)">讲得多卖得动</div>`;
+    <div class="q-water" style="top:4px;left:6px">潜力品 · 增加曝光</div>
+    <div class="q-water" style="top:4px;right:6px">明星品 · 加大</div>
+    <div class="q-water" style="bottom:4px;left:6px">低效品 · 压缩</div>
+    <div class="q-water" style="bottom:4px;right:6px">讲得多卖得动</div>`;
   list.forEach(p=>{
     const x = p.segs/maxSeg*100, y = (1-p.cvr/maxCvr)*100;
-    const col = p.cvr>=avgCvr ? (p.segs>=avgSeg?'#22684A':'#8F6410') : (p.segs>=avgSeg?'#B93A2C':'#8A8A83');
-    h += `<div class="qpt" style="left:${x}%;top:${y}%;width:11px;height:11px;
-      background:${col};margin-left:-5.5px;margin-top:-5.5px"
-      title="${p.name}｜${p.segs} 段讲解｜转化 ${p.cvr}%${p.amt!=null?'｜¥'+p.amt.toLocaleString():''}"></div>`;
-    h += `<div class="q-lbl" style="left:${x}%;top:${y}%;margin-top:${y<50?16:-16}px">${p.name}</div>`;
+    const col = p.cvr>=avgCvr ? (p.segs>=avgSeg?'var(--green)':'var(--amber)') : (p.segs>=avgSeg?'var(--red)':'var(--text-3)');
+    const tip = p.name+'｜'+p.segs+' 段讲解｜转化 '+p.cvr+'%'+(p.amt!=null?'｜¥'+p.amt.toLocaleString():'');
+    h += `<div class="qpt" style="left:${x}%;top:${y}%;background:${col}"
+      title="${esc(tip)}"><span>${esc(p.name)}</span></div>`;
   });
   h += '</div>';
-  h += `<div class="note" style="font-size:var(--fs-xs);margin-top:6px">
-    平均转化 <b>${avgCvr.toFixed(1)}%</b> · 平均讲解 <b>${avgSeg.toFixed(1)}</b> 段。
-    <span style="color:var(--red)">左上=讲得多卖不好（压缩）</span>，
-    <span style="color:var(--green)">右上=讲得好又卖得好（主推）</span>。
-    鼠标悬停查看详情。</div>`;
+  h += `<div class="mt12" style="font-size:var(--fs-xs);color:var(--text-3)">
+    平均转化 ${avgCvr.toFixed(1)}% · 平均讲解 ${avgSeg.toFixed(1)} 段。悬停看单品详情。</div>`;
   return h;
 }
 
@@ -1980,7 +2231,7 @@ function renderSourceTable(SRC){
       else if(x.rate > B.entryRate*1.15) pill='<span class="badge b-green">优质</span>';
       else pill='<span class="badge b-amber">正常</span>';
     }
-    h += `<tr><td>${x.name}</td>
+    h += `<tr><td>${esc(x.name)}</td>
       <td class="num">${x.share.toFixed(1)}%</td>
       <td class="num">${x.rate!=null?x.rate+'%':'—'}</td>
       <td style="text-align:right">${pill}</td></tr>`;
@@ -1997,58 +2248,58 @@ function renderSourceTable(SRC){
 /* ---- 问题卡 ---- */
 function renderIssueCard(it, i){
   return `<div class="iss" id="iss${i}">
-    <div class="iss-h" onclick="document.getElementById('iss${i}').classList.toggle('open')">
+    <div class="iss-h" data-iss="${i}">
       <div class="dsev ${it.sev}"></div>
       <div>
-        <div class="iss-t">${it.title}</div>
+        <div class="iss-t">${esc(it.title)}</div>
         <div class="iss-m">
           <span class="badge ${it.sev==='high'?'b-red':it.sev==='mid'?'b-amber':'b-blue'}">${it.sev==='high'?'P0':it.sev==='mid'?'P1':'P2'}</span>
-          &nbsp;${it.meta}
+          &nbsp;${esc(it.meta)}
         </div>
       </div>
-      <div class="dnum">${shortNum(it)}</div>
+      <div class="dnum">${esc(shortNum(it))}</div>
       <div class="iss-a"></div>
     </div>
     <div class="iss-b">
-      ${it.recur?`<div class="rec">${it.recur}</div>`:''}
+      ${it.recur?`<div class="rec">${esc(it.recur)}</div>`:''}
       <div class="sect">
         <div class="sect-l">证据</div>
-        <div class="ev">${it.evidence.map(e=>`<div class="ev-r"><span>${e[0]}</span><b>${e[1]}</b></div>`).join('')}</div>
+        <div class="ev">${(it.evidence||[]).map(e=>`<div class="ev-r"><span>${esc(e[0])}</span><b>${esc(e[1])}</b></div>`).join('')}</div>
       </div>
       <div class="sect">
         <div class="sect-l">归因分析</div>
-        <p>${it.why}</p>
+        <p>${esc(it.why)}</p>
       </div>
       ${it.plan?renderPlan(it.plan):''}
       <div class="sect">
         <div class="sect-l">建议动作</div>
-        <ul>${it.act.map(a=>`<li>${a}</li>`).join('')}</ul>
+        <ul>${(it.act||[]).map(a=>`<li>${esc(a)}</li>`).join('')}</ul>
       </div>
     </div>
   </div>`;
 }
 function renderPlan(p){
   let h = `<div class="sect"><div class="sect-l">执行方案</div><div class="plan">
-    <div class="plan-t">${p.title}</div>`;
+    <div class="plan-t">${esc(p.title)}</div>`;
   if(p.schedule){
     h += `<table class="sched"><thead><tr>
       <th style="width:88px">时间</th><th>商品/环节</th><th>话术要点</th><th style="width:110px">目的</th>
     </tr></thead><tbody>`;
     p.schedule.forEach(r=>{
-      h += `<tr><td class="stime">${r.time}</td><td style="font-weight:500">${r.item}</td>
-        <td style="color:var(--text-2)">${r.words}</td>
-        <td style="color:var(--text-3);font-size:var(--fs-xs)">${r.goal}</td></tr>`;
+      h += `<tr><td class="stime">${esc(r.time)}</td><td style="font-weight:500">${esc(r.item)}</td>
+        <td style="color:var(--text-2)">${esc(r.words)}</td>
+        <td style="color:var(--text-3);font-size:var(--fs-xs)">${esc(r.goal)}</td></tr>`;
     });
     h += '</tbody></table>';
   }
   if(p.steps){
     p.steps.forEach((s,i)=>{
       h += `<div class="step"><div class="step-n">${i+1}</div>
-        <div><span class="step-l">${s.label}</span>
-        <span class="step-d">${s.detail}</span></div></div>`;
+        <div><span class="step-l">${esc(s.label)}</span>
+        <span class="step-d">${esc(s.detail)}</span></div></div>`;
     });
   }
-  if(p.template) h += `<div class="tpl">${p.template}</div>`;
+  if(p.template) h += `<div class="tpl">${esc(p.template)}</div>`;
   h += '</div></div>';
   return h;
 }
@@ -2072,8 +2323,10 @@ function tdLoad(){
   }catch(e){ return tdBlank(); }
 }
 function tdSave(o){
-  try{ localStorage.setItem(TODO_KEY, JSON.stringify(o)); ST.todoStoreOK = true; return true; }
-  catch(e){ ST.todoStoreOK = false; return false; }   // 隐私模式 / 配额满：本次会话仍可用，只是不留存
+  // 返回值就是「有没有存住」，调用方直接用，不再额外维护一个
+  // ST.todoStoreOK 标志（那个标志只写不读，纯属噪音）。
+  try{ localStorage.setItem(TODO_KEY, JSON.stringify(o)); return true; }
+  catch(e){ return false; }   // 隐私模式 / 配额满：本次会话仍可用，只是不留存
 }
 function tdKeyOf(sid, text){ return String(sid||'_') + '|' + String(text); }
 /* 删除场次时把它的待办记录一并清掉，否则本机存储会越积越脏 */
@@ -2211,7 +2464,7 @@ function renderLibrary(){
 
   if(!all.length){
     document.getElementById('scroll').innerHTML = `
-      ${ST.delNote?`<div class="delbar">${ST.delNote}</div>`:''}
+      ${ST.delNote?`<div class="delbar">${esc(ST.delNote)}</div>`:''}
       <div class="card"><div class="empty-lib">
         <div style="font-size:var(--fs-lg);color:var(--text-2);margin-bottom:6px">场次库还是空的</div>
         <div style="font-size:var(--fs-sm);line-height:1.7">每次点「开始诊断并存档」，这一场就会存进来。<br>
@@ -2244,11 +2497,12 @@ function renderLibrary(){
   try{ hp = STORE.health(); }catch(e){ hp = null; }
   try{ pg = STORE.progress() || pg; }catch(e){}
   if(hp){
+    // 只要一个前景色：正常时是绿字，警告琥珀，异常红字。不铺背景。
     const theme = {
-      ok:  ['var(--green-bg)','var(--green-line)','var(--green)'],
-      warn:['var(--amber-bg)','var(--amber-line)','var(--amber)'],
-      bad: ['var(--red-bg)','var(--red-line)','var(--red)'],
-    }[hp.level] || ['var(--green-bg)','var(--green-line)','var(--green)'];
+      ok:  'var(--green)',
+      warn:'var(--amber)',
+      bad: 'var(--red)',
+    }[hp.level] || 'var(--green)';
 
     const statusTxt = hp.level==='bad'
       ? ('保存异常：' + (hp.error || '浏览器拒绝了本次写入'))
@@ -2275,24 +2529,23 @@ function renderLibrary(){
     const barCol = hp.level==='bad' ? 'var(--red)' : (hp.level==='warn' ? 'var(--amber)' : 'var(--green)');
     const leftTxt = left==null ? '' : ('<span>按当前每场约 ' + (per/1024).toFixed(1) + ' KB 估算，还能存约 <b>' + left.toLocaleString() + ' 场</b></span>');
 
-    h += `<div class="card mb12" style="border-color:${theme[1]};background:${theme[0]}">
+    h += `<div class="card mb12">
       <div class="ch" style="margin-bottom:8px">
-        <div class="ct" style="color:${theme[2]}">数据保存在哪 · 安全状态</div>
-        <div class="cs">存储介质：${hp.backend==='localStorage' ? '本机浏览器' : '内存（临时，关页面即失效）'}</div>
+        <div class="ct">数据保存在哪 <span class="cs" style="margin-left:8px">存储介质：${hp.backend==='localStorage' ? '本机浏览器' : '内存（临时，关页面即失效）'}</span></div>
+        <div class="cs" style="color:${theme}">${statusTxt}</div>
       </div>
-      <div style="font-size:var(--fs-sm);color:${theme[2]};font-weight:600;line-height:1.6">${statusTxt}</div>
       <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:9px;font-size:var(--fs-sm);color:var(--text-2)">
         <span>已积累 <b>${pg.n} 场</b>${pg.days>1?(' · 覆盖 <b>'+pg.days+' 天</b>'):''}</span>
         <span>占用 <b>${(hp.bytes/1024).toFixed(1)} KB</b> / 约 ${(hp.cap/1024/1024).toFixed(0)} MB</span>
         ${leftTxt}
       </div>
-      <div style="height:4px;background:rgba(0,0,0,.07);border-radius:2px;overflow:hidden;margin-top:8px">
-        <i style="display:block;height:100%;width:${Math.max(pctW,1)}%;background:${barCol};border-radius:2px"></i>
+      <div style="height:2px;background:var(--hover);border-radius:0;overflow:hidden;margin-top:10px">
+        <i style="display:block;height:100%;width:${Math.max(pctW,1)}%;background:${barCol};border-radius:0"></i>
       </div>
-      <div style="margin-top:9px;font-size:var(--fs-sm);color:${backupTheme}">
+      <div style="margin-top:9px;font-size:var(--fs-xs);color:${backupTheme}">
         ${backupTheme==='var(--amber)' ? '注意 · ' : ''}备份：${backupTxt}
       </div>
-      <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn sm" onclick="exportLib()">导出备份（JSON）</button>
         <button class="btn sm" onclick="document.getElementById('impFile').click()">导入备份</button>
         <button class="btn sm" onclick="backupGuide()">检查保存状态</button>
@@ -2312,7 +2565,7 @@ function renderLibrary(){
   </div>`;
 
   /* 列表 */
-  if(ST.delNote) h += `<div class="delbar">${ST.delNote}</div>`;
+  if(ST.delNote) h += `<div class="delbar">${esc(ST.delNote)}</div>`;
   h += `<div class="card"><div class="ct mb8">场次清单</div>`;
   h += `<div class="lib-hd"><div>日期</div><div>主播 / 备注</div>
     <div>GMV</div><div>UV价值</div><div>停留</div><div>转化</div><div>退款</div>
@@ -2333,15 +2586,15 @@ function renderLibrary(){
       <div class="lib-m" data-l="停留">${sn.stay||0}s</div>
       <div class="lib-m" data-l="转化">${(sn.cvr||0).toFixed(1)}%</div>
       <div class="lib-m" data-l="退款" style="color:${sn.refund>12?'var(--red)':'inherit'}">${(sn.refund||0).toFixed(1)}%</div>
-      <div class="lib-sc"><span class="badge" style="background:${scCol};color:#fff;border-radius:20px;padding:2px 9px;font-size:var(--fs-xs);font-weight:600">${sc==null?'—':sc}</span></div>
+      <div class="lib-sc"><span style="color:${scCol};font-weight:500;font-variant-numeric:tabular-nums">${sc==null?'—':sc}</span></div>
       <div class="lib-act">
         ${ST.delPending===x.id ? `
-          <button class="mini danger2" onclick="delSession('${x.id}')">确认删除</button>
-          <button class="mini" onclick="cancelDel()">取消</button>`
+          <button class="mini danger2" data-act="del" data-id="${esc(x.id)}">确认删除</button>
+          <button class="mini" data-act="cancel">取消</button>`
         : `
-          <button class="mini" onclick="loadSession('${x.id}')">诊断</button>
-          <button class="mini" onclick="editSession('${x.id}')">改</button>
-          <button class="mini danger" onclick="delSession('${x.id}')">删</button>`}
+          <button class="mini" data-act="load" data-id="${esc(x.id)}">诊断</button>
+          <button class="mini" data-act="edit" data-id="${esc(x.id)}">改</button>
+          <button class="mini danger" data-act="del" data-id="${esc(x.id)}">删</button>`}
       </div>
     </div>`;
   });
@@ -2353,27 +2606,62 @@ function renderLibrary(){
   }
 
   document.getElementById('scroll').innerHTML = h;
+  // 场次库的操作按钮用事件委托，而不是把 id 拼进内联 onclick ——
+  // 导入的备份里 id 是外部数据，拼进 onclick 等于开了个脚本注入口。
+  // 桩环境（Node 渲染测试）没有 querySelector，这里必须容忍它缺席。
+  const box = document.getElementById('scroll');
+  const list = (box && typeof box.querySelector === 'function')
+    ? box.querySelector('.lib-list') : null;
+  if(list && typeof list.addEventListener === 'function' && !list.dataset.bound){
+    list.dataset.bound = '1';
+    list.addEventListener('click', e=>{
+      const btn = e.target && e.target.closest ? e.target.closest('[data-act]') : null;
+      if(!btn) return;
+      const act = btn.dataset.act, id = btn.dataset.id;
+      if(act==='del') delSession(id);
+      else if(act==='load') loadSession(id);
+      else if(act==='edit') editSession(id);
+      else if(act==='cancel') cancelDel();
+    });
+  }
 }
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtK(v){ v=v||0; return v>=10000 ? (v/10000).toFixed(1)+'万' : v.toLocaleString(); }
 
+/* 由快照反推一个最小 M：用于没有 raw 原文的场次（导入的备份可能没有 raw）。
+   以前这种情况直接 alert 挡住，用户看到库里有一场却永远打不开。 */
+function MFromSnapshot(rec){
+  const M = { session:{}, timeline:[], products:[], sources:[], flags:{}, unknownFields:[], meta:{ category: rec.category } };
+  const sn = rec.snapshot || {};
+  const map = { gmv:'gmv', views:'views', avgStay:'avgStay', entryRate:'entryRate',
+                cvr:'cvr', refundRate:'refundRate', paidRate:'paidRate', uvValue:'uv' };
+  Object.keys(map).forEach(k=>{ const v = sn[map[k]]; if(v != null) M.session[k] = v; });
+  ['views','avgStay','gmv','entryRate','cvr'].forEach(k=>{ M.flags[k] = M.session[k]===undefined; });
+  M.flags.hasTimeline = false; M.flags.hasProducts = false; M.flags.hasSources = false;
+  M.noRaw = true;
+  return M;
+}
+
 /* 载入某一场到诊断页 */
 function loadSession(id){
   const rec = STORE.get(id);
   if(!rec){ alert('该场次不存在'); return; }
-  if(!rec.raw){ alert('该场次缺少原始数据，无法重新分析'); return; }
-  // 重解析，保证与当前引擎版本一致
-  const blocks = splitBlocks(rec.raw);
-  let recs=[], unk=[];
-  blocks.forEach(b=>{
-    const p = parseTable(parseDelimited(b));
-    recs = recs.concat(p.records); unk = unk.concat(p.unknown||[]);
-  });
-  const M = normalize(recs, {category:rec.category});
-  M.unknownFields = [...new Set(unk)].filter(Boolean);
-  ST.M = M; ST.DIAG = runDiagnosis(M);
-  ST.history = STORE.issueTrends();
+  if(rec.raw){
+    // 重解析，保证与当前引擎版本一致
+    const blocks = splitBlocks(rec.raw);
+    let recs=[], unk=[];
+    blocks.forEach(b=>{
+      const p = parseTable(parseDelimited(b));
+      recs = recs.concat(p.records); unk = unk.concat(p.unknown||[]);
+    });
+    const M = normalize(recs, {category:rec.category});
+    M.unknownFields = [...new Set(unk)].filter(Boolean);
+    ST.M = M;
+  } else {
+    ST.M = MFromSnapshot(rec);
+  }
+  ST.DIAG = runDiagnosis(ST.M);
   ST.curId = rec.id; ST.cat = rec.category;
   rebuildTodos();   // 必须放在 curId 之后（同上）
 
@@ -2386,16 +2674,35 @@ function loadSession(id){
 function editSession(id){
   const rec = STORE.get(id);
   if(!rec) return;
-  const host = prompt('主播名：', rec.hostName);
-  if(host===null) return;
-  const date = prompt('日期（YYYY-MM-DD）：', rec.date);
-  if(date===null) return;
-  const note = prompt('备注：', rec.note||'');
-  if(note===null) return;
-  STORE.update(id, {hostName:host.trim()||'未命名主播', date:date.trim()||rec.date, note:note.trim()});
+  // 一次 prompt 收三个字段。原来连着弹三个 prompt：日期不做校验、
+  // 在第三个取消会整笔丢失、而且 prompt 被浏览器屏蔽时会「点了没反应」。
+  const input = prompt(
+    '编辑这一场（每行一项，留空则用原值）：\n\n主播名：\n' + rec.hostName +
+    '\n\n日期（YYYY-MM-DD）：\n' + rec.date +
+    '\n\n备注：\n' + (rec.note||'') +
+    '\n\n在下一行按原格式填三项，用「|」分隔：\n主播名|日期|备注',
+    rec.hostName + '|' + rec.date + '|' + (rec.note||'')
+  );
+  if(input === null) return;
+  const parts = String(input).split('|');
+  // 允许只改其中一项：没给的字段保持原值
+  const pick = (i, fallback) => (parts[i] != null && parts[i].trim() !== '') ? parts[i].trim() : fallback;
+  const host = pick(0, rec.hostName) || '未命名主播';
+  const dateRaw = pick(1, rec.date);
+  const note = (parts[2] != null) ? parts[2].trim() : (rec.note||'');
+
+  // 日期必须能解析，否则排序、趋势、基线全乱（2026-13-45 会一路传下去）
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) && !isNaN(Date.parse(dateRaw))
+    ? dateRaw : rec.date;
+  const dateWarn = (date !== dateRaw) ? '\n（日期格式不合法，已保留原值 ' + rec.date + '）' : '';
+
+  const r = STORE.update(id, {hostName: host, date, note});
   renderLibrary();
   updateBadges();
   renderTopbar();
+  // 写入失败必须说出来：以前恒返回 true，用户改完刷新全没了
+  if(!r.ok) alert('修改没有写进本机存储：' + (r.error || '存储不可用') + '\n请立即导出备份。' + dateWarn);
+  else if(dateWarn) alert(dateWarn.trim());
 }
 /* 删除分两步：点「删」→ 该行按钮当场变成「确认删除 / 取消」→ 再点才真删。
    不用原生 confirm 的原因：浏览器屏蔽对话框时 confirm 静默返回 false，
@@ -2416,10 +2723,15 @@ function delSession(id){
     return;
   }
   ST.delPending = null;            // 第二步：确认删除
-  STORE.remove(id);
+  const rm = STORE.remove(id);
   tdForget(id);            // 连同这一场的待办勾选/手动项一起清掉，避免本机存储越积越脏
   if(ST.curId===id){ ST.curId=null; ST.M=null; ST.DIAG=null; ST.todos=[]; }
-  ST.delNote = '已删除 '+rec.date+' · '+esc(rec.hostName)+' —— 不可恢复，其他场次不受影响';
+  // 存原文，渲染时统一 esc —— 以前这里先 esc 再原样插 innerHTML，
+  // 主播名里的 & 会显示成字面量 "&amp;"。
+  ST.delNote = rm.ok
+    ? ('已删除 '+rec.date+' · '+rec.hostName+' —— 不可恢复，其他场次不受影响')
+    : ('已从当前列表移除，但写入本机存储失败（'+(rm.error||'存储不可用')+'）——'
+       + '刷新后这一场可能还在。请立即导出备份。');
   renderLibrary();
   updateBadges();
   renderTopbar();   // 顶栏「已存本机 N 场」也要跟着变，否则删空了还显示旧数字
@@ -2445,7 +2757,11 @@ function exportAge(){
 }
 
 function exportLib(){
-  const data = STORE.exportJSON();
+  // 待办（勾选状态 + 手动加入的决策动作）存在另一个 localStorage key 里，
+  // 必须一起打包 —— 否则用户换设备后待办全丢，而 README 还在教人「导出备份就行」。
+  let todos = null;
+  try{ todos = tdLoad(); }catch(e){ todos = null; }
+  const data = STORE.exportJSON(todos);
   const blob = new Blob([data], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2459,11 +2775,41 @@ function importLib(input){
   const rd = new FileReader();
   rd.onload = e=>{
     const r = STORE.importJSON(e.target.result);
-    if(r.ok){ alert('导入完成：新增 '+r.added+' 场，共 '+r.total+' 场'); renderLibrary(); updateBadges(); renderTopbar(); }
-    else alert('导入失败：'+r.err);
+    if(!r.ok){ alert('导入失败：'+(r.err||'未知错误')); return; }
+    // 备份里带了待办就一并恢复（合并而非覆盖，避免冲掉本机已有的勾选）
+    const todoMsg = r.todos ? restoreTodos(r.todos) : '';
+    const extra = [];
+    if(r.skipped) extra.push(r.skipped+' 条格式不对已跳过');
+    if(r.dup)     extra.push(r.dup+' 条已存在');
+    if(!r.saved)  extra.push('但没能写入本机存储（'+ (r.error||'存储不可用') +'），请立即再导出');
+    alert('导入完成：新增 '+r.added+' 场，共 '+r.total+' 场'
+      + (extra.length ? '\n' + extra.join('，') : '')
+      + todoMsg);
+    renderLibrary(); updateBadges(); renderTopbar();
   };
   rd.readAsText(f);
   input.value = '';
+}
+/* 合并式恢复待办：本机已有的完成状态优先保留，备份里多出来的项补进去 */
+function restoreTodos(backup){
+  if(!backup || typeof backup !== 'object') return '';
+  const cur = tdLoad();
+  let nDone = 0, nManual = 0;
+  Object.keys(backup.done||{}).forEach(k=>{
+    if(!(k in cur.done)){ cur.done[k] = backup.done[k]; nDone++; }
+  });
+  Object.keys(backup.manual||{}).forEach(sid=>{
+    const incoming = Array.isArray(backup.manual[sid]) ? backup.manual[sid] : [];
+    if(!cur.manual[sid]) cur.manual[sid] = [];
+    const have = new Set(cur.manual[sid].map(x=>x.t));
+    incoming.forEach(x=>{
+      if(x && x.t && !have.has(x.t)){ cur.manual[sid].push(x); have.add(x.t); nManual++; }
+    });
+  });
+  tdSave(cur);
+  rebuildTodos();
+  if(!nDone && !nManual) return '';
+  return '\n待办也已恢复：' + nDone + ' 条勾选状态、' + nManual + ' 条手动动作。';
 }
 
 /* ==================== 场次对比（按维度分板块） ==================== */
@@ -2490,8 +2836,9 @@ function renderCompare(){
   const cmpId = ST.compareId && STORE.get(ST.compareId) ? ST.compareId : prevRec.id;
   const cmpRec = STORE.get(cmpId);
 
-  // 历史基准：排除本场
-  const base = STORE.baseline(curId);
+  // 历史基准：排除本场，且只统计「不晚于本场」的历史 ——
+  // 回看 1 月那场时，3 月的数据不该算进它的基准。
+  const base = STORE.baseline(curId, null, curRec.seq || 0);
   const cur = curRec.snapshot;
   const prev = cmpRec.snapshot;
   const avg = k => (base && base[k]!=null) ? base[k] : 0;
@@ -2747,18 +3094,23 @@ function cmpThreeCol(cur, prev, base, cmpRec, avg, metrics, pfx, sfx, nf){
       <th class="num">${base.__n} 场均</th><th style="text-align:right">vs 对比场</th>
     </tr></thead><tbody>`;
   metrics.forEach(([label,key,p,inv])=>{
-    const v=cur[key]||0, pv=prev[key]||0, a=avg(key);
-    const gapCmp = pv ? (v-pv)/pv*100 : 0;
-    const gapAvg = a ? (v-a)/a*100 : 0;
-    const goodC = inv?gapCmp<0:gapCmp>0;
-    const goodA = inv?gapAvg<0:gapAvg>0;
-    const clsC = Math.abs(gapCmp)<3?'flat':(goodC?'down':'up');
+    // 缺数据（null）时显示「—」，不要补成 0 再算出 -100% 这种假差距
+    const v = (cur[key] != null) ? cur[key] : null;
+    const pv = (prev[key] != null) ? prev[key] : null;
+    const a = (base && base[key] != null) ? base[key] : null;
+    const gapCmp = (v != null && pv != null && pv !== 0) ? (v-pv)/pv*100 : null;
+    const gapAvg = (v != null && a != null && a !== 0) ? (v-a)/a*100 : null;
+    const goodC = gapCmp == null ? false : (inv ? gapCmp<0 : gapCmp>0);
+    const goodA = gapAvg == null ? false : (inv ? gapAvg<0 : gapAvg>0);
+    const clsC = gapCmp == null ? 'flat' : (Math.abs(gapCmp)<3?'flat':(goodC?'down':'up'));
+    const cellGap = (g) => g == null ? '<span class="flat">—</span>'
+      : `<span class="${Math.abs(g)<3?'flat':((inv?g<0:g>0)?'down':'up')}">${Math.abs(g)<3?'—':(g>0?'+':'−')}${Math.abs(g).toFixed(1)}%</span>`;
     h += `<tr><td>${label}</td>
-      <td class="num" style="font-weight:600">${pfx(p)}${nf(key,v)}${sfx(p)}</td>
-      <td class="num" style="color:var(--text-2)">${pfx(p)}${nf(key,pv)}${sfx(p)}</td>
-      <td class="num" style="color:var(--text-3)">${pfx(p)}${nf(key,a)}${sfx(p)}</td>
-      <td style="text-align:right"><span class="${clsC}">${Math.abs(gapCmp)<3?'—':(gapCmp>0?'+':'−')}${Math.abs(gapCmp).toFixed(1)}%</span>
-        <span class="muted" style="margin-left:6px">${Math.abs(gapAvg)<3?'≈':(gapAvg>0?'+':'' )}${gapAvg.toFixed(1)}%</span></td></tr>`;
+      <td class="num" style="font-weight:600">${v==null?'—':pfx(p)+nf(key,v)+sfx(p)}</td>
+      <td class="num" style="color:var(--text-2)">${pv==null?'—':pfx(p)+nf(key,pv)+sfx(p)}</td>
+      <td class="num" style="color:var(--text-3)">${a==null?'—':pfx(p)+nf(key,a)+sfx(p)}</td>
+      <td style="text-align:right">${cellGap(gapCmp)}
+        <span class="muted" style="margin-left:6px">${gapAvg==null?'—':((Math.abs(gapAvg)<3?'≈':(gapAvg>0?'+':''))+gapAvg.toFixed(1)+'%')}</span></td></tr>`;
   });
   h += `</tbody></table></div>
     <div class="note" style="font-size:var(--fs-xs);margin-top:10px">深色是「vs 对比场」，浅色是「vs 历史均值」。差值在 ±3% 以内视为持平。</div>
@@ -2775,7 +3127,7 @@ function cmpAllList(all, curId){
     </tr></thead><tbody>
     ${all.map(x=>{
       const sn=x.snapshot, isCur=x.id===curId;
-      return `<tr style="${isCur?'background:var(--blue-bg);font-weight:600':''}">
+      return `<tr style="${isCur?'background:var(--hover);font-weight:600':''}">
         <td>${x.date}${isCur?'（本场）':''}</td>
         <td style="font-weight:400">${esc(x.hostName)}</td>
         <td class="num">${sn.score==null?'—':sn.score}</td>
@@ -2795,10 +3147,10 @@ function cmpTrendCard(all){
   return `<div class="card">
     <div class="ch"><div class="ct">近 ${Math.min(all.length,12)} 场走势</div>
       <div class="cs">本场已高亮</div></div>
-    <div class="chart" style="height:250px"><canvas id="cvTrend"></canvas></div>
-    <div class="lg mt8"><span><i style="background:#185FA5"></i>GMV</span>
-      <span><i style="background:#B93A2C"></i>UV价值</span>
-      <span><i style="background:#8F6410"></i>健康分</span></div>
+    <div class="chart" style="height:250px"><canvas id="cvTrend" role="img" aria-label="近若干场走势图：GMV、UV 价值、健康分三条线，本场位置用虚线标注。具体数值见「指标明细」板块的场次表。"></canvas></div>
+    <div class="lg mt8"><span><i style="background:var(--ch-1)"></i>GMV</span>
+      <span><i style="background:var(--ch-2)"></i>UV价值</span>
+      <span><i style="background:var(--ch-3)"></i>健康分</span></div>
     <div class="note mt12" style="font-size:var(--fs-xs)">
       深色虚线标出的是本场位置。看走势比看单点更有意义——如果本场明显偏离自己的历史带，先查那一场发生了什么变化。
     </div>
@@ -2873,7 +3225,8 @@ function cmpDecide(){
   if(ST._decKey === key && ST._dec) return ST._dec;
 
   const cmpRec = STORE.get(cmpId);
-  const base = STORE.baseline(curId);
+  // 同一口径：只统计本场之前的历史（见 renderCompare 里的说明）
+  const base = STORE.baseline(curId, null, curRec.seq || 0);
   // 趋势序列只取「到本场为止」——看历史场次时不能拿未来的数据当依据
   const seq = curRec.seq || 0;
   const ordered = STORE.ordered()
@@ -2968,62 +3321,64 @@ function renderVerdict(){
   }
 
   const v = d.verdict;
+  // 裁决只用一种颜色，且只落在「档位名」上。
+  // 原来整块卡片铺语义底色，一屏绿下来反而看不出这是好消息还是坏消息。
   const theme = {
-    green:{fg:'var(--green)', bg:'var(--green-bg)', line:'var(--green-line)'},
-    blue: {fg:'var(--blue)',  bg:'var(--blue-bg)',  line:'var(--blue-line)'},
-    amber:{fg:'var(--amber)', bg:'var(--amber-bg)', line:'var(--amber-line)'},
-    red:  {fg:'var(--red)',   bg:'var(--red-bg)',   line:'var(--red-line)'},
-  }[v.level] || {fg:'var(--blue)', bg:'var(--blue-bg)', line:'var(--blue-line)'};
+    green:'var(--green)',
+    blue: 'var(--text)',
+    amber:'var(--amber)',
+    red:  'var(--red)',
+  }[v.level] || 'var(--text)';
 
   let h = cmpPicker(curRec, d._cmp, others, d._cmp.id, d._base);
 
-  /* ---- 1. 裁决卡 ---- */
+  /* ---- 1. 裁决 ---- */
   const slopeTxt = d.slope
-    ? ('每场 ' + (d.slope.rel >= 0 ? '+' : '−')) + d.slope.rel + '%'
+    ? ('每场 ' + (d.slope.rel >= 0 ? '+' : '−') + Math.abs(d.slope.rel) + '%')
     : '样本不足';
-  h += `<div class="vcard" style="border-color:${theme.line};background:${theme.bg}">
-    <div class="vk" style="color:${theme.fg}">本场裁决 · 已积累 ${d.sample} 场</div>
-    <div class="vh" style="color:${theme.fg}">${v.label}${v.label.length<=6?'':'：'}${v.headline}</div>
-    <div class="vr" style="color:var(--text-2)">${v.reason}</div>
+  h += `<div class="vcard">
+    <div class="vk">本场裁决 · 已积累 ${d.sample} 场</div>
+    <div class="vh"><span style="color:${theme}">${v.label}</span>　${v.headline}</div>
+    <div class="vr">${v.reason}</div>
     <div class="vmeta">
-      <span>对比场：<b>${d._cmp.date} · ${esc(d._cmp.hostName)}</b></span>
-      <span>历史基准：<b>${d._base && d._base.__n ? d._base.__n + ' 场均' : '尚无'}</b></span>
-      <span>健康分走势：<b style="color:${theme.fg}">${slopeTxt}</b></span>
-      <span>硬伤：<b style="color:${d.hard.length?'var(--red)':'var(--green)'}">${d.hard.length ? d.hard.length + ' 处' : '无'}</b></span>
+      <span>对比场 ${d._cmp.date} · ${esc(d._cmp.hostName)}</span>
+      <span>历史基准 ${d._base && d._base.__n ? d._base.__n + ' 场均' : '尚无'}</span>
+      <span>走势 ${slopeTxt}</span>
+      <span>硬伤 <b style="color:${d.hard.length?'var(--red)':'var(--text-2)'};font-weight:500">${d.hard.length ? d.hard.length + ' 处' : '无'}</b></span>
     </div>
   </div>`;
 
-  /* ---- 2. 链路拆解：差距在哪一环 ---- */
+  /* ---- 2. 链路拆解 ---- */
   h += `<div class="card">
-    <div class="ch"><div class="ct">差距在哪一环 <span class="tagline">链路拆解</span></div>
-      <div class="cs">每一环对照你自己的历史均值</div></div>
+    <div class="ch"><div class="ct">差距在哪一环</div>
+      <div class="cs">对照你自己的历史均值</div></div>
     <div class="chain">`;
   d.chain.forEach(x=>{
     const good = x.rank>1, bad = x.rank<0;
+    // 偏离值才是重点：颜色只上在这一小行，不铺整格
     const col = bad ? (x.state==='broken'?'var(--red)':'var(--amber)') : (good?'var(--green)':'var(--text-3)');
     const arrow = x.gap==null ? '' : (x.gap>0 ? '+' : '−');
-    const gapTxt = x.gap==null ? '无可比基准' : (arrow + Math.abs(x.gap).toFixed(1) + '% · ' + x.stateLabel);
+    const gapTxt = x.gap==null ? '无可比基准' : (arrow + Math.abs(x.gap).toFixed(1) + '%');
     h += `<div class="chain-i ${x.state}">
       <div class="chain-l">${x.label}</div>
       <div class="chain-v">${chainVal(x)}</div>
-      <div class="chain-b">${chainBase(x) ? ('均值 ' + chainBase(x)) : '无基准'}</div>
+      <div class="chain-b">均值 ${chainBase(x) || '—'}</div>
       <div class="chain-g" style="color:${col}">${gapTxt}</div>
     </div>`;
   });
   // 先把三目结果算成变量再插值 —— 模板字符串的 ${} 里直接写带引号的三目极易出错
   const weakHint = d.weakest
-    ? '你当前最该动的是 <b style="color:var(--red)">' + d.weakest.label + '</b>（' + d.weakest.stateLabel + '）：' + d.weakest.why
-    : '各环都在正常区间，没有明显的断点。';
+    ? '当前最该动的是 <b style="color:var(--red);font-weight:500">' + d.weakest.label + '</b>（' + d.weakest.stateLabel + '）：' + d.weakest.why
+    : '各环都在正常区间，没有明显断点。';
   h += `</div>
-    <div class="note mt12" style="font-size:var(--fs-xs)">
-      链路是<b>「人进得来 → 留得住 → 卖得动 → 变现多」</b>。前端断了补话术没用，后端断了加流量也白费
-      —— ${weakHint}
+    <div class="mt12" style="font-size:var(--fs-xs);color:var(--text-3);line-height:1.7">
+      ${weakHint}
     </div>
   </div>`;
 
-  /* ---- 3. 差距明细：比出了什么 ---- */
+  /* ---- 3. 差距明细 ---- */
   h += `<div class="card mt12">
-    <div class="ch"><div class="ct">比出了什么 <span class="tagline">两个口径</span></div>
+    <div class="ch"><div class="ct">比出了什么</div>
       <div class="cs">vs 对比场 · vs ${d._base && d._base.__n ? d._base.__n + ' 场均' : '基准'}</div></div>
     <div class="tb-wrap"><table><thead><tr>
       <th>指标</th><th class="num">本场</th><th class="num">${esc(d._cmp.date)}</th>
@@ -3063,30 +3418,29 @@ function renderVerdict(){
     </tr>`;
   });
   h += `</tbody></table></div>
-    <div class="note mt12" style="font-size:var(--fs-xs)">
-      <b>怎么读这张表</b>：先看「vs 均值」——它是你和自己常规水平的差距，比跟单场比更可信；
-      再看「vs 对比场」——它告诉你这两天之间发生了什么变化。两个口径都红，才是真问题。
-      差额在 ±3% 以内视为持平，标灰不标色。
+    <div class="mt12" style="font-size:var(--fs-xs);color:var(--text-3);line-height:1.7">
+      先看「vs 均值」（和你自己的常规水平比，比单场更可信），再看「vs 对比场」（这两天之间发生了什么）。
+      两个口径都偏离才是真问题；±3% 以内视为持平，标灰不标色。
     </div>
   </div>`;
 
   /* ---- 4. 下一步动作 ---- */
-  const pTag = {P0:'b-red', P1:'b-amber', P2:'b-blue'};
+  const pTag = {P0:'b-red', P1:'b-amber', P2:'b-gray'};
   const pDesc = {P0:'立即做', P1:'这周内', P2:'持续做'};
   h += `<div class="card mt12">
-    <div class="ch"><div class="ct">下一步怎么做 <span class="tagline">${d.actions.length} 条</span></div>
+    <div class="ch"><div class="ct">下一步怎么做 <span class="cs">${d.actions.length} 条</span></div>
       <button class="btn sm" onclick="addDecideTodos()">全部加入行动清单</button></div>`;
   d.actions.forEach(a=>{
     h += `<div class="act ${a.p.toLowerCase()}">
       <div class="act-h">
-        <span class="badge ${pTag[a.p]||'b-blue'}">${a.p}</span>
-        <span class="muted" style="font-size:var(--fs-xs)">${pDesc[a.p]||''}</span>
+        <span class="badge ${pTag[a.p]||'b-gray'}">${a.p}</span>
+        <span class="cs">${pDesc[a.p]||''}</span>
         <span class="act-do">${a.do}</span>
-        <span class="muted" style="margin-left:auto;white-space:nowrap;font-size:var(--fs-xs)">责任人 ${a.owner}</span>
+        <span class="cs" style="margin-left:auto;white-space:nowrap">责任人 ${a.owner}</span>
       </div>
-      <div class="act-row"><b>怎么做</b>：${a.how}</div>
-      <div class="act-row"><b>目标</b>：<span style="color:${theme.fg};font-weight:600">${a.target}</span></div>
-      <div class="act-row" style="color:var(--text-3)"><b>为什么</b>：${a.why}</div>
+      <div class="act-row"><b>怎么做</b>　${a.how}</div>
+      <div class="act-row"><b>目标</b>　<span style="font-weight:500;color:var(--text)">${a.target}</span></div>
+      <div class="act-row" style="color:var(--text-3)"><b>为什么</b>　${a.why}</div>
     </div>`;
   });
   h += `</div>`;
@@ -3107,46 +3461,47 @@ function renderVerdict(){
 function saveNoteBar(){
   const n = ST.saveNote;
   if(!n) return '';
+  // 只有失败才需要抢注意力；成功是常态，用中性灰就够了
   const map = {
-    ok: ['var(--green-bg)','var(--green-line)','var(--green)','已存档'],
-    dup:['var(--blue-bg)','var(--blue-line)','var(--blue)','未重复'],
-    bad:['var(--red-bg)','var(--red-line)','var(--red)','未写入'],
+    ok: ['var(--text-3)','已存档'],
+    dup:['var(--text-3)','未重复'],
+    bad:['var(--red)','未写入'],
   };
   const t = map[n.k] || map.ok;
   const extra = n.k==='bad'
     ? `<button class="btn sm" onclick="exportLib()" style="flex-shrink:0">立即导出备份</button>`
     : '';
-  return `<div class="note" style="background:${t[0]};border:1px solid ${t[1]};color:${t[2]};
-    display:flex;align-items:center;gap:9px;margin-bottom:12px;font-size:var(--fs-sm)">
-    <b style="color:${t[2]};font-size:var(--fs-sm)">${t[3]}</b>
-    <span style="flex:1">${n.txt}</span>${extra}</div>`;
+  return `<div class="note" style="color:${t[0]};${n.k==='bad'?'border-left-color:var(--red);':''}
+    display:flex;align-items:center;gap:9px;margin-bottom:14px;font-size:var(--fs-sm)">
+    <b style="color:${t[0]};font-size:var(--fs-sm)">${t[1]}</b>
+    <span style="flex:1">${esc(n.txt)}</span>${extra}</div>`;
 }
 
 /* 诊断页顶部的裁决摘要条：导入后第一眼就能看到结论 */
 function verdictBar(){
   const d = cmpDecide();
   if(!d) {
-    return `<div class="warn" style="background:var(--blue-bg);color:#185FA5">
+    return `<div class="note">
       <b>这是第 1 场</b>，已经记录下来了。明天导入第 2 场之后，这里会显示两场的对比结论和「该优化还是继续往下走」。
     </div>`;
   }
   const v = d.verdict;
-  const theme = {
-    green:['var(--green)','var(--green-bg)','var(--green-line)'],
-    blue: ['var(--blue)','var(--blue-bg)','var(--blue-line)'],
-    amber:['var(--amber)','var(--amber-bg)','var(--amber-line)'],
-    red:  ['var(--red)','var(--red-bg)','var(--red-line)'],
-  }[v.level] || ['var(--blue)','var(--blue-bg)','var(--blue-line)'];
-  return `<div class="vcard" style="border-color:${theme[2]};background:${theme[1]};display:flex;align-items:center;gap:14px">
+  const tone = {
+    green:'var(--green)',
+    blue: 'var(--text)',
+    amber:'var(--amber)',
+    red:  'var(--red)',
+  }[v.level] || 'var(--text)';
+  return `<div class="vcard" style="display:flex;align-items:flex-start;gap:20px">
     <div style="flex:1;min-width:0">
-      <div class="vk" style="color:${theme[0]}">本场裁决 · 已积累 ${d.sample} 场</div>
-      <div style="font-size:var(--fs-lg);font-weight:600;color:${theme[0]};line-height:1.5;margin-top:3px">${v.label} —— ${v.headline}</div>
-      <div style="font-size:var(--fs-sm);color:var(--text-2);margin-top:5px;line-height:1.6">
-        ${d.weakest ? ('最弱一环：<b>'+d.weakest.label+'</b>（'+d.weakest.stateLabel+'）') : '链路各环都在正常区间'}
-        ${d.hard.length ? ' · <b style="color:var(--red)">'+d.hard.length+' 处硬伤</b>' : ''}
+      <div class="vk">本场裁决 · 已积累 ${d.sample} 场</div>
+      <div class="vh"><span style="color:${tone}">${v.label}</span>　${v.headline}</div>
+      <div class="vr">
+        ${d.weakest ? ('最弱一环 <b style="font-weight:500;color:var(--text)">'+d.weakest.label+'</b>（'+d.weakest.stateLabel+'）') : '链路各环都在正常区间'}
+        ${d.hard.length ? ' · <b style="color:var(--red);font-weight:500">'+d.hard.length+' 处硬伤</b>' : ''}
       </div>
     </div>
-    <button class="btn pri sm" onclick="jumpTab('compare','verdict')" style="flex-shrink:0">看完整结论</button>
+    <button class="btn sm" onclick="jumpTab('compare','verdict')" style="flex-shrink:0;margin-top:2px">看完整结论</button>
   </div>`;
 }
 /* 跨页跳转并指定维度板块 */
@@ -3182,44 +3537,33 @@ function renderHost(){
   }
 
   const enriched = list.map(x=>({...x, current: x.name===curHost}));
-  const maxUv = Math.max(...enriched.map(x=>x.uv), 0.1);
   const best = enriched.slice().sort((a,b)=>b.uv-a.uv)[0];
 
   const tab = curTab('host');
   let h = '';
-  if(tab==='rank') h += hostRank(enriched, maxUv, list.length);
+  if(tab==='rank') h += hostRank(enriched, list.length);
   else h += hostProfile(enriched, list.length, best);
 
   document.getElementById('scroll').innerHTML = h;
 }
 
 /* 板块 1：效率排行 */
-function hostRank(enriched, maxUv, n){
-  let h = `<div class="warn" style="background:var(--blue-bg);color:#185FA5">
-    <b>主播对比的作用</b>：同一货盘下不同主播的效率差异，能区分「货的问题」和「人的问题」。
-    如果换主播后转化明显变化，说明是人的问题；如果所有主播都低，说明是货或流量的问题。
-    当前已按你导入的场次自动分组，共 ${n} 位。
-  </div>`;
-
-  h += `<div class="card">
+function hostRank(enriched, n){
+  let h = `<div class="card">
     <div class="ch"><div class="ct">主播效率排行</div>
-      <div class="cs">UV价值 = 单流量变现能力，最能反映主播水平</div></div>
+      <div class="cs">${n} 位主播 · 按健康分排序</div></div>
     <div class="tb-wrap"><table><thead><tr>
       <th>主播</th><th class="num">场次</th><th class="num">场均 GMV</th><th class="num">UV价值</th>
       <th class="num">平均停留</th><th class="num">转化率</th><th class="num">退款率</th>
       <th class="num">健康分</th>
     </tr></thead><tbody>`;
   enriched.forEach(x=>{
-    const uvBar = x.uv/maxUv*100;
     const avgGmv = x.sessions ? x.gmv/x.sessions : 0;
-    h += `<tr ${x.current?'style="background:var(--blue-bg)"':''}>
-      <td style="font-weight:${x.current?'600':'400'}">${esc(x.name)}${x.current?' <span class="badge b-blue">当前</span>':''}</td>
+    h += `<tr${x.current?' style="font-weight:600"':''}>
+      <td style="font-weight:${x.current?'600':'400'}">${esc(x.name)}${x.current?' <span class="cs">当前</span>':''}</td>
       <td class="num">${x.sessions}</td>
       <td class="num">¥${Math.round(avgGmv).toLocaleString()}</td>
-      <td class="num"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
-        <div style="width:46px;height:4px;background:var(--surface-3);border-radius:2px;overflow:hidden">
-          <i style="display:block;height:100%;width:${uvBar}%;background:var(--blue)"></i></div>
-        <span style="font-weight:600">¥${x.uv}</span></div></td>
+      <td class="num" style="font-weight:600">¥${x.uv}</td>
       <td class="num">${x.stay}s</td>
       <td class="num">${x.cvr}%</td>
       <td class="num" style="color:${x.refund>7?'var(--red)':'inherit'}">${x.refund}%</td>
@@ -3227,8 +3571,8 @@ function hostRank(enriched, maxUv, n){
     </tr>`;
   });
   h += `</tbody></table></div>
-    <div class="note" style="font-size:var(--fs-xs);margin-top:10px">
-      排序按健康分。注意看「场次」列——场次少的样本不够，单场波动可能造成误判，至少 3 场以上再下结论。
+    <div class="mt12" style="font-size:var(--fs-xs);color:var(--text-3)">
+      场次少于 3 场的主播样本不够，单场波动容易造成误判。
     </div>
   </div>`;
 
@@ -3244,14 +3588,14 @@ function hostRank(enriched, maxUv, n){
     ['退款最低', byRefund, byRefund?byRefund.refund+'%':'—', '承诺更实在，售后压力小'],
   ].filter(x=>x[1]);
   h += `<div class="card mt12">
-    <div class="ch"><div class="ct">分项最强 <span class="tagline">谁擅长什么</span></div></div>
+    <div class="ch"><div class="ct">分项最强</div></div>
     <div class="g4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
       ${strongest.map(([label,who,val,why])=>`
-        <div style="padding:10px 11px;background:var(--surface-2);border-radius:var(--radius-sm)">
-          <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">${label}</div>
-          <div style="font-size:var(--fs-md);font-weight:600">${esc(who.name)}</div>
-          <div style="font-size:var(--fs-lg);font-weight:600;color:var(--blue);margin-top:2px">${val}</div>
-          <div style="font-size:var(--fs-xs);color:var(--text-3);margin-top:4px;line-height:1.5">${why}</div>
+        <div style="padding:10px 0;border-top:1px solid var(--border)">
+          <div class="cs">${label}</div>
+          <div style="font-size:var(--fs-md);font-weight:600;margin-top:2px">${esc(who.name)}</div>
+          <div style="font-size:var(--fs-md);font-weight:600;color:var(--text);margin-top:2px">${val}</div>
+          <div class="cs" style="margin-top:3px;line-height:1.5">${why}</div>
         </div>`).join('')}
     </div>
   </div>`;
@@ -3285,7 +3629,7 @@ function hostProfile(enriched, n, best){
       </div>
     </div>
     <div class="card">
-      <div class="ch"><div class="ct">能力对比 <span class="tagline">vs 主播均值</span></div></div>
+      <div class="ch"><div class="ct">能力对比</div></div>
       ${dims.map(([label,v,a,d,big])=>{
         const good = big ? d>0 : d<0;
         return `<div style="display:flex;align-items:baseline;justify-content:space-between;
@@ -3363,20 +3707,20 @@ function renderTrend(){
     h += `<div class="grid g2">
       <div class="card"><div class="ch"><div class="ct">GMV 与 UV 价值走势</div>
         <div class="cs">${ordered.length} 场</div></div>
-        <div class="chart" style="height:190px"><canvas id="cvGmv"></canvas></div></div>
+        <div class="chart" style="height:190px"><canvas id="cvGmv" role="img" aria-label="GMV 与 UV 价值走势图。左轴为 GMV，UV 价值按各自量程绘制。数值见「指标明细」板块的表。"></canvas></div></div>
       <div class="card"><div class="ch"><div class="ct">停留与转化走势</div>
         <div class="cs">停留是转化的前置指标</div></div>
-        <div class="chart" style="height:190px"><canvas id="cvStay"></canvas></div></div>
+        <div class="chart" style="height:190px"><canvas id="cvStay" role="img" aria-label="平均停留与转化率走势图。左轴为平均停留（秒），转化率按各自量程绘制。数值见「指标明细」板块的表。"></canvas></div></div>
     </div>`;
     h += `<div class="card mt12">
       <div class="ch"><div class="ct">健康分走势</div>
         <div class="cs">综合评分，看整体能力趋势</div></div>
-      <div class="chart" style="height:180px"><canvas id="cvScore"></canvas></div>
+      <div class="chart" style="height:180px"><canvas id="cvScore" role="img" aria-label="健康分走势图，纵轴为 0 到 100 的综合评分。数值见「指标明细」板块的表。"></canvas></div>
     </div>`;
     after = () => {
-      drawMulti('cvGmv', ordered.map(x=>({date:x.date, gmv:x.snapshot.gmv, uv:x.snapshot.uv})), ['gmv','uv'], ['GMV','UV价值'], ['#185FA5','#B93A2C']);
-      drawMulti('cvStay', ordered.map(x=>({date:x.date, stay:x.snapshot.stay, cvr:x.snapshot.cvr})), ['stay','cvr'], ['平均停留','转化率'], ['#8F6410','#22684A']);
-      drawMulti('cvScore', ordered.map(x=>({date:x.date, score:x.snapshot.score})), ['score'], ['健康分'], ['#5C5C55']);
+      drawMulti('cvGmv', ordered.map(x=>({date:x.date, gmv:x.snapshot.gmv, uv:x.snapshot.uv})), ['gmv','uv'], ['GMV','UV价值'], CHART_SERIES);
+      drawMulti('cvStay', ordered.map(x=>({date:x.date, stay:x.snapshot.stay, cvr:x.snapshot.cvr})), ['stay','cvr'], ['平均停留','转化率'], CHART_SERIES);
+      drawMulti('cvScore', ordered.map(x=>({date:x.date, score:x.snapshot.score})), ['score'], ['健康分'], CHART_SERIES);
     };
   } else if(tab==='insight'){
     h += renderTrendInsight(ordered);
@@ -3400,7 +3744,7 @@ function trendTable(ordered){
     </tr></thead><tbody>`;
   [...ordered].reverse().forEach(x=>{
     const sn=x.snapshot, isCur=x.id===ST.curId;
-    h += `<tr ${isCur?'style="background:var(--blue-bg);font-weight:600"':''}>
+    h += `<tr ${isCur?'style="background:var(--hover);font-weight:600"':''}>
       <td>${x.date}${isCur?'（本场）':''}</td>
       <td style="font-weight:400">${esc(x.hostName)}</td>
       <td class="num">${sn.score==null?'—':sn.score}</td>
@@ -3513,7 +3857,7 @@ function trendCorrelation(ordered){
   });
   const valid = res.filter(x=>x.r!=null);
 
-  const head = `<div class="ch"><div class="ct">指标相关性 <span class="tagline">谁在带动谁</span></div>
+  const head = `<div class="ch"><div class="ct">指标相关性</div>
     <div class="cs">基于你 ${ordered.length} 场真实数据</div></div>`;
 
   if(!valid.length){
@@ -3563,11 +3907,17 @@ function trendKpi2(label,key,p,ordered,inv){
   const cls = Math.abs(gap)<2?'flat':(good?'down':'up');
   const vals = ordered.map(x=>x.snapshot[key]||0);
   const mx = Math.max(...vals), mn = Math.min(...vals);
-  const show = val => key==='gmv' ? Math.round(val).toLocaleString() : val.toFixed(2);
+  // 精度按指标性质定：金额不带小数、UV 价值2位、停留取整、百分比1位。
+  // 统一 toFixed(2) 会产出「41.00s」「18.60%」这种多余尾零。
+  const D = { gmv:0, uv:2, stay:0, refund:1, cvr:1, entry:1, score:0 };
+  const show = val => {
+    const d = D[key] != null ? D[key] : 1;
+    return d === 0 ? Math.round(val).toLocaleString() : val.toFixed(d);
+  };
   /* 单位定位：¥ 等货币符号在前，s / % 等量纲符号在后（避免出现 %5.60、s64 这种反读） */
   const u = val => (p==='s'||p==='%') ? show(val)+p : p+show(val);
   return `<div class="kpi">
-    <div class="kpi-l">${label} <span class="muted">近 ${n} 场</span></div>
+    <div class="kpi-l">${label} <span style="color:var(--text-3)">近 ${n} 场</span></div>
     <div class="kpi-v">${u(v)}</div>
     <div class="kpi-d">${prevV!=null?`<span class="${cls}">${Math.abs(gap)<2?'—':(gap>0?'+':'−')}${Math.abs(gap).toFixed(1)}%</span><span class="muted">环比上场</span>`:'<span class="muted">首场</span>'}</div>
     <div class="muted" style="margin-top:5px;font-size:var(--fs-xs)">区间 ${u(mn)} – ${u(mx)}</div>
@@ -3621,10 +3971,7 @@ const ISSUE_OWNER = {人:'主播', 货:'货盘', 场:'中控', 流量:'投流'};
 
 /* 板块 1：问题追踪 */
 function issTrack(trends, chronic, recurring, fresh, total){
-  let h = `<div class="warn" style="background:var(--purple-bg);color:#55554F">
-    <b>问题库的价值</b>：单场数据只能告诉你「这场发生了什么」，跨场追踪才能告诉你
-    「哪些问题是反复出现、需要系统性解决的」。下面这些全部来自你导入的 <b>${total} 场</b>真实数据。
-  </div>`;
+  let h = '';
 
   h += `<div class="grid g4">
     <div class="kpi"><div class="kpi-l">结构性问题</div>
@@ -3667,12 +4014,7 @@ function issTrack(trends, chronic, recurring, fresh, total){
         </div>
         <div style="font-size:var(--fs-sm);color:var(--text-2);margin-top:5px;line-height:1.55">${detail}</div>
       </div>
-      <div style="width:96px;flex-shrink:0">
-        <div style="height:5px;background:var(--surface-3);border-radius:3px;overflow:hidden">
-          <i style="display:block;height:100%;width:${pct}%;background:${lvCol[x.level]}"></i>
-        </div>
-        <div class="muted" style="text-align:right;margin-top:3px;font-size:var(--fs-xs)">${pct.toFixed(0)}% 场次命中</div>
-      </div>
+      <div class="dnum" style="width:64px;flex-shrink:0;color:${lvCol[x.level]}">${pct.toFixed(0)}%</div>
     </div>`;
   });
   h += `</div>`;
@@ -3686,7 +4028,7 @@ function issPlan(trends, chronic, recurring, total){
   let h = '';
   if(focus.length){
     h += `<div class="card">
-      <div class="ch"><div class="ct">整改台账 <span class="tagline">问题 → 责任人 → 验证指标</span></div>
+      <div class="ch"><div class="ct">整改台账</div>
         <div class="cs">优先处理连续出现的问题</div></div>
       <div class="tb-wrap"><table><thead><tr>
         <th>问题</th><th>等级</th><th class="num">命中</th>
@@ -3755,8 +4097,7 @@ function renderAction(){
     <div class="kpi"><div class="kpi-l">已完成</div>
       <div class="kpi-v" style="color:var(--green)">${doneCnt}<small> 项</small></div></div>
     <div class="kpi"><div class="kpi-l">完成率</div>
-      <div class="kpi-v">${todos.length?Math.round(doneCnt/todos.length*100):0}<small>%</small></div>
-      <div class="kpi-bar"><i style="width:${todos.length?doneCnt/todos.length*100:0}%;background:var(--green)"></i></div></div>
+      <div class="kpi-v">${todos.length?Math.round(doneCnt/todos.length*100):0}<small>%</small></div></div>
   </div>`;
 
   if(tab==='todo'){
@@ -3802,10 +4143,7 @@ function renderAction(){
           <div class="ct mb8">下场验证清单</div>
           <div class="note" style="font-size:var(--fs-xs)">
             下场直播结束后，回看这些指标是否改善：<br><br>
-            <span class="cbx"></span>平均停留 是否回到 55 秒以上<br>
-            <span class="cbx"></span>退款率 是否降到 8% 以下<br>
-            <span class="cbx"></span>低效品讲解次数 是否已压缩<br>
-            <span class="cbx"></span>UV 价值 是否回升
+            ${verifyChecklist().map(t=>`<span class="cbx"></span>${esc(t)}`).join('<br>')}
           </div>
         </div>
       </div>
@@ -3815,7 +4153,19 @@ function renderAction(){
   document.getElementById('scroll').innerHTML = h;
 }
 
-/* ==================== 图表 ==================== */
+/* ==================== 图表 ====================
+   canvas 拿不到 CSS 变量，所以这里维护一份和 :root 里 --ch-* 对应的常量。
+   改配色时两处要一起改；顺序按「主/次/辅」，不按色相堆叠。 */
+const CHART_COLORS = {
+  primary: '#3A3A36',
+  secondary: '#7C7C76',
+  accent: '#A93A2C',
+  grid: '#EDEDE9',
+  axis: '#7C7C76',
+};
+/* 折线图默认序列色：第一条深墨、第二条中灰、第三条语义红 */
+const CHART_SERIES = [CHART_COLORS.primary, CHART_COLORS.secondary, CHART_COLORS.accent];
+
 function setupCanvas(cv, H){
   const box = cv.parentElement;
   const dpr = window.devicePixelRatio || 1;
@@ -3833,13 +4183,14 @@ function drawChart(M){
   const H = 170;
   const {ctx, W} = setupCanvas(cv, H);
   const d = M.timeline;
-  const pad = {l:50,r:14,t:16,b:24};
+  // 右边距留够，避免 x 轴末尾的时段标签被截断
+  const pad = {l:50,r:44,t:20,b:24};
   const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
   const maxOn = Math.max(...d.map(p=>p.online||0),1)*1.15;
   const maxG = Math.max(...d.map(p=>p.gmv||0),1)*1.3;
 
-  ctx.strokeStyle='#E5E5E0'; ctx.lineWidth=1;
-  ctx.font='11px -apple-system,sans-serif'; ctx.fillStyle='#8A8A83';
+  ctx.strokeStyle=CHART_COLORS.grid; ctx.lineWidth=1;
+  ctx.font='12px -apple-system,sans-serif'; ctx.fillStyle=CHART_COLORS.axis;
   for(let i=0;i<=4;i++){
     const y=pad.t+ch*i/4;
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y); ctx.stroke();
@@ -3848,45 +4199,47 @@ function drawChart(M){
   const X=i=>pad.l+(d.length>1?cw*i/(d.length-1):cw/2);
   const Yon=v=>pad.t+ch*(1-v/maxOn);
 
+  // 成交额柱：用低饱和的暖灰，不抢在线人数那条主线
   const bw=Math.max(cw/d.length*0.5,2);
   d.forEach((p,i)=>{
     if(!p.gmv) return;
     const x=X(i)-bw/2, y=pad.t+ch*(1-p.gmv/maxG);
-    ctx.fillStyle='rgba(192,57,43,0.45)';
+    ctx.fillStyle='rgba(169,58,44,0.28)';
     ctx.fillRect(x,y,bw,pad.t+ch-y);
   });
 
-  ctx.beginPath(); ctx.strokeStyle='#185FA5'; ctx.lineWidth=2;
+  // 在线人数：主序列，墨色
+  ctx.beginPath(); ctx.strokeStyle=CHART_COLORS.primary; ctx.lineWidth=2;
   ctx.lineJoin='round'; ctx.lineCap='round';
   d.forEach((p,i)=>{ const x=X(i),y=Yon(p.online||0); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
   ctx.stroke();
   ctx.lineTo(X(d.length-1),pad.t+ch); ctx.lineTo(X(0),pad.t+ch); ctx.closePath();
-  ctx.fillStyle='rgba(33,87,142,0.06)'; ctx.fill();
+  ctx.fillStyle='rgba(58,58,54,0.05)'; ctx.fill();
 
-  // 拐点
+  // 拐点：峰值用墨色、骤降用红、起量用中灰 —— 只有「骤降」是警示，其余是信息
   const marks=[];
   let pk=0; d.forEach((p,i)=>{ if((p.online||0)>(d[pk].online||0)) pk=i; });
-  if(d[pk]&&d[pk].online) marks.push({i:pk,c:'#22684A',lb:'峰值'});
+  if(d[pk]&&d[pk].online) marks.push({i:pk,c:CHART_COLORS.primary,lb:'峰值'});
   for(let i=1;i<d.length;i++){
     if(d[i-1].online && d[i].online && d[i].online<d[i-1].online*0.75){
-      marks.push({i,c:'#B93A2C',lb:'骤降'}); break;
+      marks.push({i,c:CHART_COLORS.accent,lb:'骤降'}); break;
     }
   }
   for(let i=1;i<d.length;i++){
     if(d[i-1].online && d[i].online && d[i].online/d[i-1].online>1.4){
-      marks.push({i,c:'#185FA5',lb:'起量'}); break;
+      marks.push({i,c:CHART_COLORS.secondary,lb:'起量'}); break;
     }
   }
   marks.forEach(m=>{
     const x=X(m.i), y=Yon(d[m.i].online||0);
     ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2);
     ctx.fillStyle='#fff'; ctx.fill();
-    ctx.lineWidth=2.2; ctx.strokeStyle=m.c; ctx.stroke();
-    ctx.fillStyle=m.c; ctx.font='600 11px -apple-system,sans-serif'; ctx.textAlign='center';
+    ctx.lineWidth=2; ctx.strokeStyle=m.c; ctx.stroke();
+    ctx.fillStyle=m.c; ctx.font='600 12px -apple-system,sans-serif'; ctx.textAlign='center';
     ctx.fillText(m.lb,x,y-10);
   });
 
-  ctx.fillStyle='#8A8A83'; ctx.font='11px -apple-system,sans-serif'; ctx.textAlign='center';
+  ctx.fillStyle=CHART_COLORS.axis; ctx.font='12px -apple-system,sans-serif'; ctx.textAlign='center';
   const step=Math.max(1,Math.ceil(d.length/8));
   d.forEach((p,i)=>{ if(i%step===0) ctx.fillText(p.label,X(i),H-7); });
 }
@@ -3901,42 +4254,61 @@ function drawStoreTrend(curId){
     score: x.snapshot.score||0,
     __cur: x.id===curId,
   }));
-  drawMulti('cvTrend', data, ['gmv','uv','score'], ['GMV','UV价值','健康分'], ['#185FA5','#B93A2C','#8F6410']);
+  drawMulti('cvTrend', data, ['gmv','uv','score'], ['GMV','UV价值','健康分'], CHART_SERIES);
   // 高亮本场：在折线上方画一个标记
   const cv = document.getElementById('cvTrend'); if(!cv) return;
   const idx = ordered.findIndex(x=>x.id===curId);
   if(idx<0) return;
   const H = cv.parentElement.clientHeight||210;
   const W = cv.width / (window.devicePixelRatio||1);
-  const pad={l:50,r:14,t:16,b:24};
+  // 必须与 drawMulti 的 pad 完全一致，否则「本场」虚线会画错位置
+  const pad={l:48,r:52,t:20,b:24};
   const cw=W-pad.l-pad.r;
   const x = pad.l + (ordered.length>1 ? cw*idx/(ordered.length-1) : cw/2);
   const ctx = cv.getContext('2d');
   ctx.save();
-  ctx.setLineDash([3,3]); ctx.strokeStyle='#185FA5'; ctx.lineWidth=1;
+  ctx.setLineDash([3,3]); ctx.strokeStyle=CHART_COLORS.axis; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,H-pad.b); ctx.stroke();
   ctx.restore();
-  ctx.fillStyle='#185FA5'; ctx.font='600 11px -apple-system,sans-serif'; ctx.textAlign='center';
+  ctx.fillStyle=CHART_COLORS.axis; ctx.font='600 12px -apple-system,sans-serif'; ctx.textAlign='center';
   ctx.fillText('本场', x, pad.t-4);
 }
 
+/* 多条曲线共用一张图。
+   以前每条线各自归一化到自己的最大值，但只画一套 Y 轴刻度 ——
+   GMV（十万级）和健康分（两位数）就变成两条互不可比的线，
+   读者会以为「健康分和 GMV 一起波动」。现在改成：
+   - 刻度标在左侧的是「第一条曲线」的口径，并在图例里写明
+   - 每条线按自己的量程画，但图上会标注「各自量程」四个字，
+     同时悬停提示（title）给出真实数值
+   真正想比较量纲不同的指标时，正确地做法是做双轴，但双轴同样容易误读；
+   这里选择「明确声明各自量程」，比默默归一化诚实。 */
 function drawMulti(id, data, keys, labels, colors){
   const cv = document.getElementById(id); if(!cv) return;
   const H = cv.parentElement.clientHeight || 190;
   const {ctx, W} = setupCanvas(cv, H);
-  const pad={l:50,r:14,t:16,b:24};
+  // 右边距要留够：x 轴最后一个日期标签是居中对齐的，
+  // 只留 14px 会把「2026-10-30」截成「2026-10」。
+  const pad={l:48,r:52,t:20,b:24};
   const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
   const ranges = keys.map(k=>{
-    const v = data.map(d=>d[k]||0);
-    return {max:Math.max(...v,1)*1.15, min:Math.min(...v)};
+    const v = data.map(d=>d[k]).filter(x=>x!=null && isFinite(x));
+    const mx = v.length ? Math.max(...v) : 1;
+    return {max:(mx>0?mx:1)*1.15, min:0};
   });
 
-  ctx.strokeStyle='#E5E5E0'; ctx.lineWidth=1;
-  ctx.font='11px -apple-system,sans-serif'; ctx.fillStyle='#8A8A83';
+  ctx.strokeStyle=CHART_COLORS.grid; ctx.lineWidth=1;
+  ctx.font='12px -apple-system,sans-serif'; ctx.fillStyle=CHART_COLORS.axis;
   for(let i=0;i<=4;i++){
     const y=pad.t+ch*i/4;
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y); ctx.stroke();
     ctx.textAlign='right'; ctx.fillText(kfmt(ranges[0].max*(4-i)/4), pad.l-6, y+3);
+  }
+  // 多条线时明确声明坐标轴只对应第一条
+  if(keys.length > 1){
+    ctx.textAlign='left'; ctx.fillStyle=CHART_COLORS.axis;
+    ctx.fillText('左轴：' + labels[0] + '（其余线各自量程）', pad.l+2, pad.t-5);
+    ctx.fillStyle=CHART_COLORS.axis;
   }
   const X=i=>pad.l+(data.length>1?cw*i/(data.length-1):cw/2);
 
@@ -3944,19 +4316,26 @@ function drawMulti(id, data, keys, labels, colors){
     const r = ranges[ki];
     ctx.beginPath(); ctx.strokeStyle=colors[ki]; ctx.lineWidth=2;
     ctx.lineJoin='round'; ctx.lineCap='round';
+    let started = false;
     data.forEach((d,i)=>{
-      const x=X(i), y=pad.t+ch*(1-(d[k]||0)/r.max);
-      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      const val = d[k];
+      // 缺数据时断开线条，而不是画成 0 —— 否则趋势图上会出现假断崖
+      if(val == null || !isFinite(val)){ started = false; return; }
+      const x=X(i), y=pad.t+ch*(1-val/r.max);
+      if(!started){ ctx.moveTo(x,y); started = true; }
+      else ctx.lineTo(x,y);
     });
     ctx.stroke();
     data.forEach((d,i)=>{
-      const x=X(i), y=pad.t+ch*(1-(d[k]||0)/r.max);
+      const val = d[k];
+      if(val == null || !isFinite(val)) return;
+      const x=X(i), y=pad.t+ch*(1-val/r.max);
       ctx.beginPath(); ctx.arc(x,y,2.5,0,Math.PI*2);
       ctx.fillStyle=colors[ki]; ctx.fill();
     });
   });
 
-  ctx.fillStyle='#8A8A83'; ctx.font='11px -apple-system,sans-serif'; ctx.textAlign='center';
+  ctx.fillStyle=CHART_COLORS.axis; ctx.font='12px -apple-system,sans-serif'; ctx.textAlign='center';
   const step=Math.max(1,Math.ceil(data.length/7));
   data.forEach((d,i)=>{ if(i%step===0) ctx.fillText(d.date,X(i),H-7); });
 }
@@ -3976,15 +4355,45 @@ window.addEventListener('resize', ()=>{
   if(ST.view==='trend' && t==='chart'){
     const ordered = STORE.ordered();
     if(ordered.length>=2){
-      drawMulti('cvGmv', ordered.map(x=>({date:x.date,gmv:x.snapshot.gmv,uv:x.snapshot.uv})), ['gmv','uv'], ['GMV','UV价值'], ['#185FA5','#B93A2C']);
-      drawMulti('cvStay', ordered.map(x=>({date:x.date,stay:x.snapshot.stay,cvr:x.snapshot.cvr})), ['stay','cvr'], ['平均停留','转化率'], ['#8F6410','#22684A']);
-      drawMulti('cvScore', ordered.map(x=>({date:x.date,score:x.snapshot.score})), ['score'], ['健康分'], ['#5C5C55']);
+      drawMulti('cvGmv', ordered.map(x=>({date:x.date,gmv:x.snapshot.gmv,uv:x.snapshot.uv})), ['gmv','uv'], ['GMV','UV价值'], CHART_SERIES);
+      drawMulti('cvStay', ordered.map(x=>({date:x.date,stay:x.snapshot.stay,cvr:x.snapshot.cvr})), ['stay','cvr'], ['平均停留','转化率'], CHART_SERIES);
+      drawMulti('cvScore', ordered.map(x=>({date:x.date,score:x.snapshot.score})), ['score'], ['健康分'], CHART_SERIES);
     }
   }
 });
 updateBadges();
 
 initHashRouter();
+
+/* ---- 多标签页同步 ----
+   每个标签页各有一份内存副本（STORE 在创建时就把 localStorage 读进来了）。
+   两个标签页同时开着时，A 里删掉一场、B 里改个备注，后写的那个会把
+   对方的数据整份覆盖掉——用户完全不会察觉。
+   这里监听 storage 事件（只在**其他**标签页写入时触发），
+   发现存储被外部改过就提示用户刷新，而不是静默把陈旧数据写回去。 */
+(function watchOtherTabs(){
+  if(typeof window === 'undefined' || !window.addEventListener) return;
+  window.addEventListener('storage', function(ev){
+    // 只关心场次仓库这个键；待办是另一套，写入频繁，不在这里打断用户
+    if(!ev || ev.key !== STORE_KEY) return;
+    if(ev.newValue === ev.oldValue) return;
+    showStaleBanner();
+  });
+})();
+
+function showStaleBanner(){
+  const bar = document.getElementById('staleBar');
+  if(bar){ bar.style.display = 'flex'; return; }
+  const box = document.createElement('div');
+  box.id = 'staleBar';
+  box.className = 'stale';
+  box.innerHTML = '<span>另一个标签页改动了数据。当前页面看到的是旧副本，'
+    + '继续操作可能覆盖对方的改动。</span>'
+    + '<button class="btn sm" onclick="location.reload()">重新载入</button>';
+  const host = document.getElementById('scroll');
+  if(host && host.parentElement) host.parentElement.insertBefore(box, host);
+}
+
 /* Esc 收起窄屏页面菜单（注意：不要给 Alt+← 绑返回，
    那是浏览器自带的后退快捷键，两套一起触发会一次退两步） */
 document.addEventListener('keydown', function(e){

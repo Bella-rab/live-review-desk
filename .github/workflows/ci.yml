@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['18', '20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: 版本信息
+        run: node --version
+
+      - name: 语法检查
+        run: |
+          node --check engine.js
+          node --check store.js
+
+      - name: 核心逻辑测试（不需要浏览器）
+        run: npm test
+
+  # 真机 Chrome 测试单独一个 job：只在 ubuntu 上跑，失败不阻塞合并，
+  # 因为无头浏览器的稳定性受环境影响较大
+  browser:
+    name: 无头 Chrome 真机测试
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: 安装 Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable || true
+      - name: 跑真机测试（chrome 路径通过环境变量覆盖）
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: |
+          node test-lib.js || echo "::warning::test-lib 在 CI 环境失败"
+          node test-browser.js || echo "::warning::test-browser 在 CI 环境失败"

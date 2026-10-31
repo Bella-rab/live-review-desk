@@ -23,7 +23,8 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const DIR = __dirname;
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+// 允许用环境变量覆盖，否则非 Windows 机器 / 非默认安装路径永远跑不了
+const CHROME = process.env.CHROME_BIN || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const PROFILE = path.join(DIR, '_tt_profile');
 const PA = path.join(DIR, '_tt_a.html');
 const PB = path.join(DIR, '_tt_b.html');

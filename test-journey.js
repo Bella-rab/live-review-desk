@@ -8,7 +8,7 @@
      4) 万一存不住，我会不会知道？            → 第 8 节（关键防呆）
    ============================================================ */
 const fs = require('fs');
-const DIR = 'C:/Users/24425/WorkBuddy/2026-09-14-20-29-26/';
+const DIR = __dirname + '/';
 const eng = fs.readFileSync(DIR+'engine.js','utf8');
 const sto = fs.readFileSync(DIR+'store.js','utf8');
 const SRC = eng + '\n' + sto;

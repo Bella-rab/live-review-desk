@@ -1,7 +1,7 @@
 /* 渲染冒烟测试：无头 DOM 桩，验证 8 个页面渲染不抛异常且内容正确
    node test-render.js */
 const fs = require('fs');
-const DIR = 'C:/Users/24425/WorkBuddy/2026-09-14-20-29-26/';
+const DIR = __dirname + '/';
 
 let pass=0, fail=0;
 function A(n,c,g){ c?(pass++,console.log('  ✓ '+n)):(fail++,console.log('  ✗ '+n+'  实际: '+JSON.stringify(g))); }
@@ -357,13 +357,33 @@ hr('12. 退化输入不能把页面打崩（未知品类 / 空值）');
   A('已知品类仍取到自己的基准', ctx.benchOf('食品').entryRate === 21.2, ctx.benchOf('食品').entryRate);
 }
 
-hr('13. 标签平衡：脚本体里的 div 开闭');
+hr('13. 标签平衡：脚本体里的标签开闭');
 {
   const hh = fs.readFileSync(DIR+'index.html','utf8');
-  const js = [...hh.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
+
+  // 朴素地数 "<div " 会把注释和字符串里的标签名也算进去，
+  // 例如一条写着「用 button 而不是 div」的注释就会让计数偏 1。
+  // 这里先剥掉 JS 注释和 HTML 注释再数，避免误报。
+  // 只做粗粒度处理（逐行去掉双斜线之后的内容、整块去掉星号注释），
+  // 对「统计标签平衡」这个用途足够。
+  function stripComments(src){
+    return src
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+  }
+
+  const js = stripComments(
+    [...hh.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n')
+  );
   const o = (js.match(/<div/g)||[]).length, c = (js.match(/<\/div>/g)||[]).length;
   A('脚本体 div 开闭平衡', o === c, [o, c]);
-  const ho = (hh.match(/<div/g)||[]).length, hc = (hh.match(/<\/div>/g)||[]).length;
+
+  const bo = (js.match(/<button/g)||[]).length, bc = (js.match(/<\/button>/g)||[]).length;
+  A('脚本体 button 开闭平衡', bo === bc, [bo, bc]);
+
+  const page = stripComments(hh);
+  const ho = (page.match(/<div/g)||[]).length, hc = (page.match(/<\/div>/g)||[]).length;
   A('整个 index.html div 开闭平衡', ho === hc, [ho, hc]);
 }
 

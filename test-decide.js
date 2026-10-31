@@ -1,9 +1,7 @@
 /* 决策引擎测试：验证五种典型场景的裁决是否正确 */
-const fs = require('fs');
-const path = 'C:/Users/24425/WorkBuddy/2026-09-14-20-29-26/';
-const eng = fs.readFileSync(path+'engine.js','utf8');
-const API = new Function(eng + '; return {decide, trendSlope, stayCvrElasticity, buildGaps, chainState, pctGap};')();
-const {decide, trendSlope, stayCvrElasticity, buildGaps} = API;
+// 直接 require 模块导出，而不是把源码字符串塞进 new Function。
+// 后者属于动态求值：静态扫描会当作代码注入入口，语法错误也没有行号。
+const { decide, trendSlope, stayCvrElasticity, buildGaps, chainState, pctGap } = require('./engine.js');
 
 let pass=0, fail=0;
 const A = (name, cond, extra) => {

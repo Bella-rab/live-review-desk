@@ -66,32 +66,90 @@ function benchOf(cat){
 
 /* ---------- 3. 清洗工具 ---------- */
 function splitLines(text){
-  return text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim()!=='');
+  // 去掉 UTF-8 BOM：Excel 导出的 CSV/TXT 常带 BOM，
+  // 不剥的话第一列表头永远匹配不上（\uFEFF观看人数 ≠ 观看人数）
+  return text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n')
+    .split('\n').filter(l=>l.trim()!=='');
 }
+/* 分隔符判定：在前几行里投票，而不是只看第一行。
+   只看第一行的话，首行是标题（「直播间数据汇总」）时就退化成单列，
+   整块数据全丢。 */
 function detectDelimiter(line){
+  const text = String(line == null ? '' : line);
   const cands = [
-    {d:'\t', n:(line.match(/\t/g)||[]).length},
-    {d:',',  n:(line.match(/,/g)||[]).length},
-    {d:'|',  n:(line.match(/\|/g)||[]).length},
-    {d:'，', n:(line.match(/，/g)||[]).length},
-    {d:/\s{2,}/, n:(line.match(/\s{2,}/g)||[]).length},
+    {d:'\t', n:(text.match(/\t/g)||[]).length},
+    {d:',',  n:(text.match(/,/g)||[]).length - (text.match(/\d,\d{3}/g)||[]).length}, // 扣掉千分位逗号
+    {d:'|',  n:(text.match(/\|/g)||[]).length},
+    {d:'，', n:(text.match(/，/g)||[]).length},
+    {d:/\s{2,}/, n:(text.match(/\s{2,}/g)||[]).length},
   ];
   cands.sort((a,b)=>b.n-a.n);
   return cands[0].n > 0 ? cands[0].d : '\t';
 }
+/* 在最多 8 行里投票选分隔符：标题行（0 个分隔符）不会因为排第一而胜出 */
+function detectDelimiterFromRows(lines){
+  const head = lines.slice(0, 8);
+  let best = null, bestScore = 0;
+  const candidates = ['\t', ',', '|', '，'];
+  candidates.forEach(d=>{
+    // 得分 = 出现该分隔符的行数（一致性）优先，总出现次数次之
+    const rowsHit = head.filter(l=>l.indexOf(d) >= 0).length;
+    const total = head.reduce((a,l)=>a + (l.match(new RegExp(d === '|' ? '\\|' : d, 'g'))||[]).length, 0);
+    const score = rowsHit * 100 + total;
+    if(rowsHit >= 2 && score > bestScore){ best = d; bestScore = score; }
+  });
+  if(best) return best;
+  // 退回单行判定
+  for(const l of head){ const d = detectDelimiter(l); if(d) return d; }
+  return '\t';
+}
+/* 按 CSV 规则切一行：引号内不切分，且保留空单元格。
+   以前用 /"[^"]*"|[^,]+/ 匹配，匹配不到空字段 —— Excel 里一个空格子
+   会让后面所有列整体左移，指标全错位。
+
+   千分位逗号：`1,234,567` 里的逗号不是分隔符。判据是「逗号后面紧跟 3 位数字
+   且再往后不是数字」—— 只有这种情况才当作千分位，其余仍切开。
+   不用占位符替换是因为占位符可能和真实内容撞车。 */
+function isThousandsComma(s, i){
+  const rest = s.slice(i + 1);
+  // 后面必须是恰好 3 位数字，且之后不是数字（1,234 → 是；1,23 → 否）
+  return /^\d{3}(?!\d)/.test(rest) && /\d$/.test(s.slice(0, i));
+}
 function smartSplit(line, delim){
-  if(/"/.test(line) && typeof delim === 'string'){
-    const esc = delim === '\t' ? '\\t' : delim.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-    const re = new RegExp(`"[^"]*"|[^${esc}]+`, 'g');
-    const m = line.match(re);
-    if(m) return m.map(s=>s.replace(/^"|"$/g,''));
+  const d = (delim === /\s{2,}/) ? null : delim;
+  if(!d){
+    return String(line).split(delim).map(c=>c.trim().replace(/^"|"$/g,''));
   }
-  return typeof delim === 'string' ? line.split(delim) : line.split(delim);
+  const s = String(line);
+  // 逗号分隔时先判断这一行到底有没有「真·逗号分隔符」：
+  // 整行只有千分位逗号（如 `成交金额,1,234,567` 这种其实是 tab 分隔被误判）
+  // 就不该按逗号切。
+  const cells = [];
+  let cur = '', inQuote = false;
+  for(let i=0;i<s.length;i++){
+    const ch = s[i];
+    if(inQuote){
+      if(ch === '"'){
+        // 转义的双引号 ""
+        if(s[i+1] === '"'){ cur += '"'; i++; }
+        else inQuote = false;
+      } else cur += ch;
+      continue;
+    }
+    if(ch === '"'){ inQuote = true; continue; }
+    if(ch === d){
+      if(d === ',' && isThousandsComma(s, i)){ cur += ch; continue; }
+      cells.push(cur); cur = ''; continue;
+    }
+    cur += ch;
+  }
+  cells.push(cur);
+  return cells.map(c=>c.trim());
 }
 function parseDelimited(text){
   const lines = splitLines(text);
   if(!lines.length) return [];
-  const delim = detectDelimiter(lines[0]);
+  const delim = detectDelimiterFromRows(lines);
   return lines.map(l=>smartSplit(l, delim).map(c=>c.trim().replace(/^"|"$/g,'')));
 }
 
@@ -119,20 +177,58 @@ function isTimeValue(v){
   const s = String(v).trim();
   return /^\d{1,2}:\d{2}(:\d{2})?$/.test(s) || /^\d{10}$|^\d{13}$/.test(s);
 }
+/* 通用短表头的显式消歧。
+   这些词在多张表里都合法，但后台导出最常用的是右边那个含义：
+   - 「转化率」在直播后台默认指成交转化率（曝光转化率会写成「曝光进入率」）
+   - 「商品」单列时是商品名，不是点击率
+   显式写死比让模糊匹配去猜可靠 —— 猜错的代价是整列指标错位。 */
+const HEADER_OVERRIDE = {
+  '转化率': 'cvr',
+  '商品':   'itemAt',
+  '商品名': 'itemAt',
+  '销售额': 'gmv',
+  '主播':   'hostName',
+};
+/* 表头归一化：去掉空白与括号等装饰符号 */
+function normHeader(s){
+  return String(s == null ? '' : s).toLowerCase().replace(/[\s()（）\[\]【】\-_/：:]/g,'');
+}
+/* 字段匹配。优先级：显式消歧 > 完全相等 > 同义词互相包含。
+   两个硬约束（都是踩过的坑）：
+   1. 归一键为空（表头是 "()" / "-" / "  "）时直接返回 null。
+      空串是任何字符串的子串，会命中字典里的第一个字段，
+      结果空表头被当成 exposure，整张表错位。
+   2. 用「长度占比」而不是纯双向 includes。
+      "S" 会命中 exposure（"impressions" 里含 s），
+      "A" 会命中 avgStay（"average_stay" 里含 a）。
+      所以要求：单向命中时，较短一方 ≥2 字符，且覆盖较长方一半以上。 */
 function matchField(rawName, context){
   if(!rawName) return null;
-  const k = String(rawName).trim().toLowerCase().replace(/[\s()（）\[\]【】\-_/]/g,'');
+  const k = normHeader(rawName);
+  if(!k) return null;                       // 空表头不映射
   // 上下文提示：流量来源表里，「观看人数」应归到 sourceViews
   if(context === 'source' && /观看人数|流量人数|人数|uv/.test(k)) return 'sourceViews';
   if(context === 'source' && /进入率|转化率/.test(k)) return 'sourceEntry';
-  let best=null, bestLen=0;
+
+  if(Object.prototype.hasOwnProperty.call(HEADER_OVERRIDE, k)) return HEADER_OVERRIDE[k];
+
+  let best=null, bestScore=-1;
   for(const [canon, syns] of Object.entries(FIELD_SYNONYMS)){
     for(const syn of syns){
-      const s = syn.toLowerCase().replace(/[\s()（）\[\]【】\-_/]/g,'');
+      const s = normHeader(syn);
       if(!s) continue;
-      if(k===s || k.includes(s) || s.includes(k)){
-        if(s.length>bestLen){ best=canon; bestLen=s.length; }
+      let score = -1;
+      if(k === s){
+        score = 1000 + s.length;            // 完全相等最优先
+      } else {
+        const shorter = Math.min(k.length, s.length);
+        const longer  = Math.max(k.length, s.length);
+        // 短的一侧必须 ≥2 字符，且占长的一侧一半以上
+        if(shorter >= 2 && shorter / longer >= 0.5){
+          if(k.includes(s) || s.includes(k)) score = shorter;
+        }
       }
+      if(score > bestScore){ best = canon; bestScore = score; }
     }
   }
   return best;
@@ -141,6 +237,56 @@ function matchField(rawName, context){
 /* 表头行里是否含流量来源特征 */
 function isSourceTable(headerRow){
   return headerRow.some(c=>/流量来源|渠道|来源|入口|流量类型/.test(String(c||'')));
+}
+
+/* ---------- 3.5 数值合理性校验 ---------- */
+/* 后台导出和手工粘贴都可能带脏值（负数播放量、300% 的退款率、把 0.194 当
+   19.4% 写）。这些值进入规则引擎会产出荒谬文案（「平均停留 -10 秒，低于基准
+   117%」），所以入库前先夹到物理上可能的区间。
+   返回 {value, clamped}：clamped 用于在 UI 上提示「这个值被修正过」。 */
+const RANGE_RULES = {
+  // [最小值, 最大值, 是否允许小数]
+  views:      [0, 1e10], exposure:   [0, 1e11],
+  avgOnline:  [0, 1e8],  peakOnline: [0, 1e8],
+  avgStay:    [0, 100000], gmv:      [0, 1e11],
+  orders:     [0, 1e9],  buyers:     [0, 1e9],
+  refund:     [0, 1e11], items:      [0, 1e9],
+  comments:   [0, 1e10], likes:      [0, 1e10],
+  newFans:    [0, 1e9],  shares:     [0, 1e9],
+  cartAdd:    [0, 1e9],  aov:        [0, 1e8],
+};
+/* 百分比类字段：上限 100%，负值无意义。
+   注意「付费占比 100%」「退款率 100%」是可能的，所以上界取 100 而不是 99。 */
+const PERCENT_KEYS = ['entryRate','ctr','cvr','refundRate','naturalRate','paidRate'];
+
+function clampValue(key, v){
+  if(v == null || typeof v !== 'number' || !isFinite(v)) return v;
+  if(PERCENT_KEYS.includes(key)){
+    // 百分比：超过 100 或为负都是数据本身错了，夹到边界
+    return Math.min(100, Math.max(0, v));
+  }
+  const r = RANGE_RULES[key];
+  if(!r) return v;
+  return Math.min(r[1], Math.max(r[0], v));
+}
+/* 哪些值应当直接丢弃而不是夹到边界。
+   负数观看人数、负数 GMV 不是「很小」，是「这一格填错了」——
+   夹成 0 会被当成「这场 0 人观看」，那是一个比缺失更糟的错误结论。
+   这里返回 null 表示「这个值不可用」，parseTable 会跳过它。 */
+function rejectValue(key, v){
+  if(v == null || typeof v !== 'number' || !isFinite(v)) return v;
+  // 计数类与金额类不允许负数
+  const nonNegative = ['views','exposure','avgOnline','peakOnline','avgStay','gmv',
+                       'orders','buyers','refund','items','comments','likes','newFans',
+                       'shares','cartAdd','aov'];
+  if(nonNegative.includes(key) && v < 0) return null;
+  // 百分比类：负数无意义；超过 100 也说明填错了（如把 250 当成 2.5）
+  if(PERCENT_KEYS.includes(key)){
+    if(v < 0) return null;
+    // 明显超出 100 的，判定为录入错误而不是真实值
+    if(v > 100) return null;
+  }
+  return clampValue(key, v);
 }
 
 /* ---------- 4. 解析 ---------- */
@@ -159,17 +305,64 @@ function locateHeader(rows){
     rows: rows.slice(bestIdx+1),
   };
 }
-function detectVerticalKV(rows){
-  const hasTime = rows.some(r=>r.some(c=>isTimeValue(c)));
-  let hits=0, total=0;
-  rows.forEach(r=>{
-    if(r.length<2) return;
-    total++;
-    if(matchField(r[0])) hits++;
-  });
-  return total>=2 && hits/total>=0.5 && !hasTime;
+/* 竖排（指标名 \t 数值）判定。
+   必须同时满足，否则一张普通商品表会被误判成竖排、整表报废：
+   - 总行数 ≥2，且首列能匹配字段的行占比 ≥ 0.5
+   - 没有时间值（有时间说明是分时段明细）
+   - 首行必须能匹配字段（竖排的第一行就是指标名；商品表首行是表头）
+   - 首列不得出现「像数据」的值：纯数字（含 8.1% / ¥100）、
+     或长度 ≤2 的字母数字组合（A / C / S / M / L 这类 SKU 或尺码）
+   这一条是核心：商品表首列是商品名，SKU 编码和尺码会命中 A→avgStay、
+   C→items 之类的短同义词，导致 3 个商品被解析成 {avgStay:8.1, items:9}。 */
+function looksLikeDataValue(v){
+  const s = String(v == null ? '' : v).trim();
+  if(!s) return true;                                   // 空也算「非表头」
+  if(/^[-+]?[\d,]+(\.\d+)?%?$/.test(s)) return true;     // 纯数字/百分比
+  if(/^[¥$]/.test(s)) return true;                       // 货币
+  if(/^\d{1,2}:\d{2}/.test(s)) return true;              // 时间
+  // 1-2 位 ASCII 只在「不是常见指标名缩写」时才算数据。
+  // 直接按长度判会把 "GMV" 这类三字母指标误杀；这里只拦 1-2 位
+  // （A / C / S / M / L 这类 SKU 或尺码）。
+  if(/^[\x00-\x7F]{1,2}$/.test(s)) return true;
+  return false;
 }
-function parseVerticalKV(rows){
+/* 竖排表的表头对：`指标名称 / 数值`、`项目 / 值` 这类。
+   竖排数据经常带一行表头，不能因为它首列匹配不上就否掉整张表。 */
+const KV_HEADER_LABEL = /^(指标名称|指标|项目|字段|名称|维度|类目|统计项)$/;
+const KV_HEADER_VALUE = /^(数值|值|数据|金额|结果|指标值)$/;
+function isKVHeaderRow(row){
+  if(!row || row.length < 2) return false;
+  const a = String(row[0] == null ? '' : row[0]).trim();
+  const b = String(row[1] == null ? '' : row[1]).trim();
+  return KV_HEADER_LABEL.test(a) || KV_HEADER_VALUE.test(b);
+}
+function detectVerticalKV(rows){
+  const usable = (rows||[]).filter(r=>r && r.length>=2);
+  if(usable.length < 2) return false;
+  const hasTime = usable.some(r=>r.some(c=>isTimeValue(c)));
+  if(hasTime) return false;
+  // 首行如果是「指标名称 / 数值」这类竖排表头，跳过它再判断数据行
+  const body = isKVHeaderRow(usable[0]) ? usable.slice(1) : usable;
+  if(body.length < 2) return false;
+  // 首列不能看起来像数据（SKU / 尺码 / 纯数字）。
+  // 这一条是核心：商品表首列是商品名，A→avgStay、C→items 之类的短同义词
+  // 会让 3 个商品被解析成 {avgStay:8.1, items:9}。
+  const dataLike = body.filter(r=>looksLikeDataValue(r[0])).length;
+  if(dataLike > 0) return false;
+  let hits = 0;
+  body.forEach(r=>{ if(matchField(r[0])) hits++; });
+  return hits / body.length >= 0.5;
+}
+/* 文本字段：不参与数值校验（商品名、渠道名可以是任意字符串） */
+const TEXT_FIELDS = ['itemAt','productName','sourceName','hostName'];
+
+/* 竖排键值对解析。
+   注意这里也要走 rejectValue 校验 —— 竖排是后台导出最常见的格式
+   （「观看人数 \t 9600」一行一项），如果只校验横排，
+   一列负数的观看人数、300% 的退款率照样会进规则引擎，
+   产出「平均停留 -10 秒，低于基准 117%」这种荒谬结论。
+   被拒绝的值记进 rejected，由调用方汇总后提示用户。 */
+function parseVerticalKV(rows, rejected){
   const obj={};
   rows.forEach(r=>{
     if(r.length<2) return;
@@ -179,21 +372,36 @@ function parseVerticalKV(rows){
       const raw = r[i];
       if(!raw) continue;
       const v = toNum(raw);
-      if(v!==null){ obj[f]=v; break; }
+      if(v===null) continue;
+      if(typeof v === 'number' && !TEXT_FIELDS.includes(f) && f !== 'timeSlot'){
+        const fixed = rejectValue(f, v);
+        if(fixed === null){
+          // 明显填错：丢弃并记录，不当成 0 参与后续计算
+          if(rejected) rejected.push({field:f, from:v, to:null, rejected:true});
+          return;
+        }
+        if(fixed !== v){
+          if(rejected) rejected.push({field:f, from:v, to:fixed});
+        }
+        obj[f] = fixed;
+      } else {
+        obj[f] = v;
+      }
+      break;
     }
   });
   return obj;
 }
-const TEXT_FIELDS = ['itemAt','productName','sourceName','hostName'];
 function parseTable(rows){
   if(!rows || !rows.length) return {records:[],fields:[],unknown:[],mode:'none'};
 
   if(detectVerticalKV(rows)){
-    const rec = parseVerticalKV(rows);
+    const rejected = [];
+    const rec = parseVerticalKV(rows, rejected);
     if(Object.keys(rec).length>=2){
       const unknown = rows.filter(r=>r[0] && !matchField(r[0])).map(r=>r[0])
         .filter(x=>x && !/^(指标|项目|名称|序号)$/.test(x));
-      return {records:[rec], fields:Object.keys(rec), unknown, mode:'vertical'};
+      return {records:[rec], fields:Object.keys(rec), unknown, mode:'vertical', clamped:rejected};
     }
   }
 
@@ -208,6 +416,7 @@ function parseTable(rows){
     : headers;
 
   const records=[];
+  const clamped=[];
   body.forEach(r=>{
     const obj={};
     let hit=0;
@@ -223,6 +432,16 @@ function parseTable(rows){
         v = /^(—|-|--|N\/A|暂无|无)$/i.test(t) ? null : t;
       } else {
         v = toNum(raw);
+        if(typeof v === 'number'){
+          const fixed = rejectValue(f, v);
+          if(fixed === null){
+            // 明显填错的值直接丢弃，并记下来让 UI 提示；
+            // 夹到 0 会被当成「这场 0 人观看」，比缺失更糟
+            clamped.push({field:f, from:v, to:null, rejected:true});
+            return;
+          }
+          if(fixed !== v){ clamped.push({field:f, from:v, to:fixed}); v = fixed; }
+        }
       }
       if(v===null||v===undefined) return;
       obj[f]=v; hit++;
@@ -231,7 +450,7 @@ function parseTable(rows){
   });
   const fields=[...new Set(mapped.filter(Boolean))];
   const unknown = rows[loc.headerRow] ? rows[loc.headerRow].filter((h,i)=>h && !mapped[i]) : [];
-  return {records, fields, unknown, mode:'horizontal'};
+  return {records, fields, unknown, mode:'horizontal', clamped};
 }
 
 /* ---------- 5. 归一化 ---------- */
@@ -266,11 +485,18 @@ function normalize(allRecords, meta){
                    'gmv','orders','buyers','aov','refund','refundRate','items','cartAdd',
                    'entryRate','ctr','cvr','naturalRate','paidRate','gpm'];
 
-  // 汇总
-  const sumCand = allRecords.filter(r=>r.timeSlot===undefined && r.productName===undefined && r.views!==undefined);
-  const pool = sumCand.length ? sumCand : allRecords.filter(r=>r.timeSlot===undefined);
+  // 汇总行选取。
+  // 商品行（itemAt + ctr/cvr/gmv）和分时段行也带 gmv/ctr/cvr，
+  // 只按「命中的 sumKeys 数量」排序会让商品行赢过真正的汇总行 ——
+  // 结果一整个商品被当成整场 GMV，或者根本没有汇总数据时凭空造出一场。
+  // 所以先排除带商品名/时段的行，再按命中数取最高的那条。
+  const nonRowKeys = ['itemAt','productName','sourceName','timeSlot'];
+  const isDetailRow = r => nonRowKeys.some(k=>r[k] !== undefined);
+  const sumCand = allRecords.filter(r=>!isDetailRow(r) && r.views !== undefined);
+  const pool = sumCand.length ? sumCand : allRecords.filter(r=>!isDetailRow(r));
   const scored = pool.map(r=>({r, c:sumKeys.filter(k=>r[k]!==undefined).length}))
                      .sort((a,b)=>b.c-a.c);
+  // 至少 2 个汇总字段才认为是「整场数据」，单个零散字段不足以代表一场
   if(scored.length && scored[0].c>=2) M.session = {...scored[0].r};
 
   // 分时段
@@ -283,6 +509,15 @@ function normalize(allRecords, meta){
       gmv: r.gmvAt!==undefined ? r.gmvAt : (r.gmv!==undefined ? r.gmv : null),
       item: r.itemAt || null,
     })).filter(t=>t.online!==null || t.gmv!==null);
+    // 按时间排序：后台导出的分时段表未必有序。
+    // 跨零点（23:50 → 00:00）不能简单按「一天中的分钟数」排 —— 那会把 00:00
+    // 排到最前面。判断是否跨天：原始顺序里有没有相邻两条回退了 12 小时以上，
+    // 有就说明跨零点，保持原顺序；没有才按分钟排序。
+    const mins = M.timeline.map(t=>parseMin(t.label));
+    const spansMidnight = mins.some((m,i)=> i>0 && m!=null && mins[i-1]!=null && (mins[i-1]-m) > 720);
+    if(!spansMidnight && M.timeline.every((t,i)=>mins[i]!=null)){
+      M.timeline.sort((a,b)=>parseMin(a.label) - parseMin(b.label));
+    }
   }
 
   // 商品
@@ -294,7 +529,6 @@ function normalize(allRecords, meta){
   prodRecs.forEach((r,i)=>{
     M.products.push({
       name: r.productName || r.itemAt || `商品 ${i+1}`,
-      cnt: r.imgs !== undefined ? r.imgs : null,
       ctr: r.ctr!==undefined ? r.ctr : null,
       cvr: r.cvr!==undefined ? r.cvr : null,
       amt: r.gmv!==undefined ? r.gmv : null,
@@ -314,11 +548,11 @@ function normalize(allRecords, meta){
 
   // 缺失标记
   ['views','avgStay','gmv','entryRate','cvr'].forEach(k=>{ M.flags[k] = M.session[k]===undefined; });
-  M.flags.hasTimeline = M.timeline.length >= 5;
+  M.flags.hasTimeline = M.timeline.length >= 4;   // 与 analyzeTimeline 的门槛保持一致
   M.flags.hasProducts = M.products.length >= 2;
   M.flags.hasSources = M.sources.length >= 2;
 
-  // 衍生指标
+  // 衍生指标（全部加除零保护）
   const s = M.session;
   if(s.uvValue===undefined && s.views && s.gmv!==undefined) s.uvValue = +(s.gmv/s.views).toFixed(2);
   if(s.aov===undefined && s.gmv!==undefined && s.orders) s.aov = +(s.gmv/s.orders).toFixed(1);
@@ -488,6 +722,23 @@ function runDiagnosis(M){
   const RF = analyzeRefund(M);
   const push = o => issues.push(o);
 
+  /* 没有任何可判断的指标时直接返回「无结论」，不给分。
+     以前空 session 扣不了分、一路返回 96 —— 用户粘一堆没表格的文本进来，
+     场次库显示「健康分 96」，看着一切良好，实际一个指标都没读到。
+     注意：分时段表 / 商品表 / 流量来源表也是数据，不能只看 session ——
+     只上传一张分时段表时，拐点与时段效率规则必须照常工作。 */
+  const METRIC_KEYS = ['views','gmv','avgStay','entryRate','cvr','refundRate','paidRate','uvValue'];
+  const hasSummary = METRIC_KEYS.some(k=>s[k]!=null && isFinite(s[k]));
+  const hasDetail = M.timeline.length > 0 || M.products.length > 0 || M.sources.length > 0;
+  if(!hasSummary && !hasDetail){
+    return {
+      issues, score:null, penalty:0, benchmark: base, benchName: M.meta.category||'通用',
+      analyses:{A, PQ, SRC, RF}, empty:true,
+    };
+  }
+  // 只有明细、没有汇总时也要给分，否则场次库那条记录永远没有健康分
+  const hasAnyMetric = true;
+
   /* 规则 1：停留时长 */
   if(s.avgStay != null){
     const bs = base('stay');
@@ -517,10 +768,13 @@ function runDiagnosis(M){
     }
   }
 
-  /* 规则 2：退款率 + 归因 */
+  /* 规则 2：退款率 + 归因
+     阈值口径必须与 decide 的 detectHard 对齐（都以品类基准为锚），
+     否则同一份数据在「单场诊断」是 P1、在「结论与决策」是硬伤，两页打架。 */
   if(RF && RF.bench && RF.rate > RF.bench*1.4){
+    const hardRefund = RF.rate >= Math.max(15, RF.bench*2.2);
     push({
-      sev: RF.rate > RF.bench*2.2 ? 'high' : 'mid',
+      sev: hardRefund ? 'high' : 'mid',
       category:'货',
       title:`退款率 ${RF.rate}%，高于基准 ${RF.gap}pp，侵蚀 GMV ¥${RF.lostGmv?.toLocaleString()||'—'}`,
       short:'退款侵蚀成交',
@@ -989,35 +1243,10 @@ function issuesToTodos(issues){
   return todos;
 }
 
-/* ---------- 10. 跨场问题库（模拟历史场次） ---------- */
-function buildHistory(currentIssues, category){
-  // 无真实历史时，用当前问题构造合理的跨场追踪视图
-  const hist = [];
-  const topics = [
-    {key:'停留不足', title:'平均停留低于基准', c:4, t:7, trend:'持续恶化'},
-    {key:'成交承接', title:'点击成交率偏低', c:3, t:7, trend:'波动'},
-    {key:'退款', title:'退款率超基准', c:2, t:7, trend:'新出现'},
-    {key:'排品资源错配', title:'低效品占用过多时长', c:5, t:7, trend:'长期存在'},
-    {key:'时段效率洼地', title:'特定时段流量浪费', c:3, t:7, trend:'波动'},
-  ];
-  const matched = [];
-  currentIssues.forEach(it=>{
-    const t = topics.find(x=>it.short && it.short.includes(x.key.slice(0,2))) ||
-              topics.find(x=>it.title.includes(x.key.slice(0,2)));
-    if(t && !matched.includes(t)) matched.push(t);
-  });
-  // 补充未命中的历史问题
-  topics.forEach(t=>{ if(!matched.includes(t)) matched.push(t); });
-  return matched.slice(0,5).map((t,i)=>({
-    ...t,
-    id:i,
-    sev: t.c>=4?'high':(t.c>=3?'mid':'low'),
-    detail: t.c>=4
-      ? '该问题在多场直播中反复出现，属于结构性问题，不是单场偶然。建议列入本周重点整改项，并指定责任人跟踪。'
-      : t.c>=3 ? '该问题间歇性出现，与单场的排品或状态波动相关。建议建立检查机制，在开播前逐项确认。'
-               : '该问题在本场首次明显出现，建议下场重点观察是否复现，避免演变成长期问题。',
-  }));
-}
+/* ---------- 10. 跨场问题库 ----------
+   buildHistory() 曾在这里硬编码一份「7 天假历史」（停留不足 c:4、退款 c:2 …），
+   它会凭空造出「持续恶化的趋势」。真实跨场追踪已由 store.issueTrends() 承担，
+   这里的假实现没有任何调用点，已删除 —— 留着只会被误用。 */
 
 /* ============================================================
    9. 决策引擎
@@ -1116,8 +1345,13 @@ function buildChain(cur, base){
    否则既算硬伤又算下滑，措辞会打架。 */
 function detectHard(cur, base, ordered){
   const out = [];
-  if(cur.refund!=null && cur.refund>=15){
-    const bTxt = (base && base.refund>0) ? '，历史均值 '+(+base.refund).toFixed(1)+'%' : '';
+  // 退款率：与单场诊断规则 2 同一口径（品类基准 ×2.2，且不低于 15%）。
+  // 单一固定阈值会让不同类目出现「诊断报警 / 决策不认」的矛盾。
+  const refundBench = (base && base.refund > 0) ? base.refund : null;
+  const refundLine = refundBench != null ? Math.max(15, refundBench*2.2) : 15;
+  if(cur.refund!=null && cur.refund >= refundLine){
+    const bTxt = refundBench
+      ? '，历史均值 '+(+refundBench).toFixed(1)+'%' : '';
     out.push({key:'refund', label:'退款率', value:cur.refund, unit:'%', d:1,
       text:'退款率 '+cur.refund.toFixed(1)+'%'+bTxt+'，已进入伤客又伤利润的区间'});
   }
@@ -1314,9 +1548,20 @@ function buildNextActions(cur, base, chain, hard, el, verdict){
     if(!m) return;
     const g = estimateGain(cur, base, w.key, el);
     const gainTxt = g ? ('，GMV 量级约回到 ¥'+g.gmvTo.toLocaleString()+'（保守估计）') : '';
-    const whyTxt = w.why + (g
-      ? (' 按你历史的弹性折算（每 +1% ' + w.label + ' 约带来 +' + (g.kCvr*100).toFixed(0) + '% 转化），这一项补上 GMV 量级可回到 ¥' + g.gmvTo.toLocaleString() + '。')
-      : '');
+    // 这里的 kCvr 是「该指标 1% 相对提升 → GMV 传导比」，不是转化率。
+    // 以前写成「约带来 +100% 转化」，把 GMV 弹性说成了转化率，语义是错的。
+    let elasTxt = '';
+    if(g){
+      if(w.key === 'stay'){
+        elasTxt = ' 按你历史实测的停留→转化弹性（k=' + g.kCvr.toFixed(2)
+          + (g.elasN ? '，' + g.elasN + ' 场样本' : '，经验值')
+          + '），停留补到均值后 GMV 量级可回到 ¥' + g.gmvTo.toLocaleString() + '。';
+      } else {
+        elasTxt = ' 该环节按乘法链路近似等比传导到 GMV，补到均值后 GMV 量级可回到 ¥'
+          + g.gmvTo.toLocaleString() + '（已按 70% 保守折算）。';
+      }
+    }
+    const whyTxt = w.why + elasTxt;
     acts.push({
       p: idx===0 ? 'P1' : 'P2',
       owner:m.owner,
@@ -1401,4 +1646,24 @@ function buildGaps(cur, cmp, base){
     };
   }).filter(x=>x.severity>=1)
     .sort((a,b)=>b.severity-a.severity);
+}
+
+/* 导出（Node 测试环境）。
+   这样测试用 require() 就能拿到纯函数，不必再 eval 源码 ——
+   eval 既慢又让 IDE/静态检查失效，而且一旦有语法错误只能看到
+   「Unexpected token」这种没有行号的报错。 */
+if(typeof module !== 'undefined' && module.exports){
+  module.exports = {
+    FIELD_SYNONYMS, BENCHMARKS, HEADER_OVERRIDE,
+    benchOf, matchField, normHeader,
+    splitLines, detectDelimiter, detectDelimiterFromRows, smartSplit, parseDelimited,
+    toNum, isTimeValue, locateHeader, detectVerticalKV, parseVerticalKV, parseTable,
+    clampValue, RANGE_RULES, PERCENT_KEYS, looksLikeDataValue, isKVHeaderRow,
+    formatSlot, normalize,
+    analyzeTimeline, analyzeProducts, analyzeSources, analyzeRefund,
+    runDiagnosis, issuesToTodos,
+    pctGap, chainState, trendSlope, stayCvrElasticity, buildChain,
+    detectHard, pickVerdict, estimateGain, buildNextActions, decide, buildGaps,
+    buildStayPlan, buildUvPlan, buildItemPlan, buildSlotPlan,
+  };
 }

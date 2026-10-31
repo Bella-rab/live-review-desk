@@ -1,0 +1,36 @@
+{
+  "name": "live-review-desk",
+  "version": "3.1.0",
+  "description": "纯前端、零依赖的直播数据复盘台：录一场，自动跟历史比、跟品类基准比，给出该推进还是该纠偏的裁决",
+  "license": "MIT",
+  "author": "Bella-rab",
+  "homepage": "https://bella-rab.github.io/live-review-desk/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bella-rab/live-review-desk.git"
+  },
+  "keywords": [
+    "live-streaming",
+    "ecommerce",
+    "analytics",
+    "dashboard",
+    "zero-dependency",
+    "local-first"
+  ],
+  "private": false,
+  "scripts": {
+    "test": "node test-engine.js && node test-store.js && node test-multi.js && node test-render.js && node test-tabs.js && node test-gap.js && node test-e2e.js && node test-decide.js && node test-journey.js && node test-nav.js",
+    "test:core": "node test-engine.js && node test-store.js && node test-decide.js",
+    "test:one": "node test-engine.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.html",
+    "engine.js",
+    "store.js",
+    "LICENSE",
+    "README.md"
+  ]
+}

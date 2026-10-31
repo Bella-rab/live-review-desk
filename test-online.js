@@ -20,8 +20,10 @@ const os = require('os');
 const path = require('path');
 
 const DIR = __dirname + '/';
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const URL = (process.argv[2] || 'https://live-review-desk.app.workbuddy.host/').replace(/\/?$/, '/');
+// 允许用环境变量覆盖，否则非 Windows 机器 / 非默认安装路径永远跑不了
+const CHROME = process.env.CHROME_BIN || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+// 默认目标与 README 里宣传的线上地址保持一致（旧默认值指向已废弃的托管）
+const URL = (process.argv[2] || process.env.SITE_URL || 'https://bella-rab.github.io/live-review-desk/').replace(/\/?$/, '/');
 const FILES = ['index.html', 'engine.js', 'store.js'];
 
 let fails = 0;

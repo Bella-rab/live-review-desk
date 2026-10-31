@@ -12,41 +12,58 @@
    核心概念：
    - Session（场次）：一次直播 → 一条记录。是网站的一等公民。
    - 快照指标（snapshot）：从 M.session 抽出的扁平指标，供对比/趋势直接读
+
+   两条铁律（曾经踩过坑，别改回去）：
+   1. 缺失指标必须是 null，不能是 0。
+      0 会进入 baseline 求均值，把「这场没填」稀释成「这场表现很烂」，
+      下游 detectHard / buildChain 会据此判出根本不存在的断点。
+   2. 读不出来 ≠ 没有数据。
+      localStorage 里那串原文如果解析失败，一个字都不许覆盖 ——
+      它可能是用户唯一可抢救的备份。宁可整站只读 + 报警。
    ============================================================ */
 
 /* ---------- 常量 ---------- */
 const STORE_KEY = 'fupantai.sessions.v3';
 const STORE_VER = 3;
 
-/* 从归一化结果里抽取对比用的扁平指标 */
+/* 从归一化结果里抽取对比用的扁平指标。
+   注意所有指标都用 `!= null` 判断，绝不用 `|| 0`：
+   缺的字段留 null，下游（baseline / chain / trend）各自决定怎么处理。 */
 function snapshotOf(M, DIAG){
   const s = M.session || {};
   const D = DIAG || {};
+  const numOrNull = v => (v != null && isFinite(v)) ? v : null;
   return {
-    gmv:        s.gmv != null ? s.gmv : 0,
-    views:      s.views != null ? s.views : 0,
-    uv:         s.uvValue != null ? s.uvValue : (s.views ? +(s.gmv||0)/s.views : 0),
-    stay:       s.avgStay != null ? s.avgStay : 0,
-    entry:      s.entryRate != null ? s.entryRate : 0,
-    cvr:        s.cvr != null ? s.cvr : 0,
-    refund:     s.refundRate != null ? s.refundRate : 0,
-    paid:       s.paidRate != null ? s.paidRate : 0,
-    avgOnline:  s.avgOnline != null ? s.avgOnline : 0,
-    peakOnline: s.peakOnline != null ? s.peakOnline : 0,
-    newFans:    s.newFans != null ? s.newFans : 0,
+    gmv:        numOrNull(s.gmv),
+    views:      numOrNull(s.views),
+    // UV 价值在来源数据里本来就没有，派生不出来时留 null 而不是 0
+    uv:         numOrNull(s.uvValue != null ? s.uvValue
+                  : (s.views ? +(s.gmv||0)/s.views : null)),
+    stay:       numOrNull(s.avgStay),
+    entry:      numOrNull(s.entryRate),
+    cvr:        numOrNull(s.cvr),
+    refund:     numOrNull(s.refundRate),
+    paid:       numOrNull(s.paidRate),
+    avgOnline:  numOrNull(s.avgOnline),
+    peakOnline: numOrNull(s.peakOnline),
+    newFans:    numOrNull(s.newFans),
     score:      D.score != null ? D.score : null,
     issueCount: D.issues ? D.issues.length : 0,
   };
 }
 
-/* 生成稳定指纹：用于识别「这场是不是已经存过了」 */
+/* 生成稳定指纹：用于识别「这场是不是已经存过了」。
+   刻意不含 hostName —— 同一天换主播重播是另一个场次，不该被判重复。
+   含时间轴/商品条数与首末时段，避免「指标恰好相同但内容不同」被吞掉。 */
 function fingerprint(M){
   const s = M.session || {};
+  const tl = M.timeline || [];
+  const pd = M.products || [];
   const raw = [
     M.meta && M.meta.category,
     s.gmv, s.views, s.avgStay, s.entryRate, s.cvr, s.refundRate,
-    (M.timeline||[]).length,
-    (M.products||[]).length,
+    tl.length, tl.length ? tl[0].label : '', tl.length ? tl[tl.length-1].label : '',
+    pd.length, pd.length ? pd[0].name : '',
   ].join('|');
   let h = 5381;
   for(let i=0;i<raw.length;i++) h = ((h<<5)+h+raw.charCodeAt(i))>>>0;
@@ -56,8 +73,8 @@ function fingerprint(M){
 /* ---------- 场次记录构造 ---------- */
 function makeSession(input){
   // input: {M, DIAG, raw, category, hostName, date, note}
-  const M = input.M;
-  const DIAG = input.DIAG;
+  const M = input.M || {};
+  const DIAG = input.DIAG || {};
   return {
     id: 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7),
     ts: Date.now(),
@@ -68,7 +85,7 @@ function makeSession(input){
     duration: (M.timeline && M.timeline.length) ? M.timeline.length : 0,
     fp: fingerprint(M),
     snapshot: snapshotOf(M, DIAG),
-    // 单调递增序号：解决同一毫秒内连续导入时 ts 相同、排序退化的问 题
+    // 单调递增序号：解决同一毫秒内连续导入时 ts 相同、排序退化的问题
     seq: input.seq != null ? input.seq : 0,
     // 存原文，引擎升级后可重解析
     raw: input.raw || '',
@@ -171,29 +188,102 @@ function createLocalBackend(key){
   };
 }
 
+/* --- 导入校验：外部 JSON 一律当成不可信输入 --- */
+const SESSION_ARRAY_FIELDS = ['issues','timeline','products','sources','unknownFields'];
+
+/* 把一条外部记录整理成可用的 Session；无法修复时返回 null。
+   补 id / seq / fp / snapshot，缺数组字段补空数组 ——
+   不补的话 issueTrends()、previous()、get() 会在运行时抛错或静默错乱。 */
+function coerceSession(rec, fallbackSeq){
+  if(!rec || typeof rec !== 'object') return null;
+  if(!rec.snapshot || typeof rec.snapshot !== 'object') return null;
+
+  const snap = {};
+  Object.keys(rec.snapshot).forEach(k=>{
+    const v = rec.snapshot[k];
+    snap[k] = (typeof v === 'number' && isFinite(v)) ? v : null;
+  });
+  // 老备份里 gmv/views 可能是 0 占位，语义保持原样即可
+
+  const date = typeof rec.date === 'string' && rec.date ? rec.date : todayStr();
+  const out = {
+    id: (typeof rec.id === 'string' && rec.id) ? rec.id : '',
+    ts: (typeof rec.ts === 'number' && isFinite(rec.ts)) ? rec.ts : Date.now(),
+    date,
+    hostName: typeof rec.hostName === 'string' && rec.hostName ? rec.hostName : '未命名主播',
+    category: typeof rec.category === 'string' && rec.category ? rec.category : '通用',
+    note: typeof rec.note === 'string' ? rec.note : '',
+    duration: (typeof rec.duration === 'number' && isFinite(rec.duration)) ? rec.duration : 0,
+    fp: (typeof rec.fp === 'string' && rec.fp) ? rec.fp : '',
+    snapshot: snap,
+    seq: (typeof rec.seq === 'number' && isFinite(rec.seq)) ? rec.seq : 0,
+    raw: typeof rec.raw === 'string' ? rec.raw : '',
+  };
+  SESSION_ARRAY_FIELDS.forEach(k=>{
+    out[k] = Array.isArray(rec[k]) ? rec[k] : [];
+  });
+  out.flags = (rec.flags && typeof rec.flags === 'object') ? rec.flags : {};
+
+  // id 缺失时补一个稳定的（基于内容 + 日期），避免 get/remove 拿到 undefined
+  if(!out.id) out.id = 's_' + fingerprint({ session: snap, timeline: out.timeline, products: out.products, meta: { category: out.category } })
+                        + '_' + String(date).replace(/\D/g,'');
+  if(!out.fp) out.fp = fingerprint({ session: snap, timeline: out.timeline, products: out.products, meta: { category: out.category } });
+  if(!out.seq) out.seq = fallbackSeq;
+  return out;
+}
+
 function createStore(backend){
   const be = backend || createMemoryBackend();
   let sessions = [];
   let loaded = false;
+  // 读取失败（JSON 损坏 / 数据结构不认识）：置位后禁止一切写回，
+  // 否则用户只是打开页面看一眼，就把唯一可抢救的原文覆盖掉了。
+  let loadError = null;
   // 最近一次持久化结果，供界面显示「已存本机 / 保存失败」
+  // ok 的三态：null=本次会话还没写过（不代表失败）、true=成功、false=失败
   let lastSave = { ok:null, at:null, error:null };
 
   function ensure(){
     if(loaded) return;
     loaded = true;
+    let raw = null;
     try{
-      const raw = be.load();
-      if(raw){
-        const data = JSON.parse(raw);
-        if(data && Array.isArray(data.sessions)) sessions = data.sessions;
-        // 版本迁移预留位
-      }
-    }catch(e){ sessions = []; }
+      raw = be.load();
+    }catch(e){
+      loadError = '读取本机存储失败：' + (e && e.message || e);
+      return;
+    }
+    if(!raw) return;                    // 空库，不是错误
+    let data;
+    try{
+      data = JSON.parse(raw);
+    }catch(e){
+      loadError = '本机存的数据已损坏（JSON 解析失败），已停止写入以免覆盖';
+      return;
+    }
+    if(!data || !Array.isArray(data.sessions)){
+      loadError = '本机存的数据格式不认识（缺少 sessions 数组），已停止写入以免覆盖';
+      return;
+    }
+    // 版本迁移预留位（未来 ver 升级在这里转换）
+    let autoSeq = 0;
+    sessions = data.sessions.map(rec=>{
+      autoSeq = Math.max(autoSeq, (rec && rec.seq) || 0);
+      return coerceSession(rec, 0);
+    }).filter(Boolean);
+    // 老数据没有 seq 的，按现有顺序补齐，保证排序/上一场定位可用
+    let next = autoSeq;
+    sessions.forEach(s=>{ if(!s.seq) s.seq = ++next; });
   }
   function serialize(){
     return JSON.stringify({ver:STORE_VER, updated:Date.now(), sessions});
   }
   function persist(){
+    if(loadError){
+      // 只读模式：明确失败，但原因是「不敢写」而不是「写不进」
+      lastSave = { ok:false, at:Date.now(), error:loadError };
+      return false;
+    }
     let ok = false, err = null;
     try{
       ok = be.save(serialize()) === true;
@@ -234,24 +324,33 @@ function createStore(backend){
       const saved = persist();
       return {record:rec, dup:false, saved};
     },
-    /* 更新某场（改日期/主播/备注） */
+    /* 更新某场（改日期/主播/备注）。返回 {ok, error}，
+       持久化失败必须向上暴露——以前恒返回 true，用户改完刷新全没了。 */
     update(id, patch){
       ensure();
       const s = sessions.find(x=>x.id===id);
-      if(!s) return false;
+      if(!s) return {ok:false, error:'该场次不存在'};
       ['date','hostName','note','category'].forEach(k=>{
         if(patch[k] != null) s[k] = patch[k];
       });
-      persist();
-      return true;
+      const ok = persist();
+      return {ok, error: lastSave.error};
     },
     remove(id){
       ensure();
       const i = sessions.findIndex(s=>s.id===id);
-      if(i<0) return false;
-      sessions.splice(i,1); persist(); return true;
+      if(i<0) return {ok:false, error:'该场次不存在'};
+      sessions.splice(i,1);
+      const ok = persist();
+      return {ok, error: lastSave.error};
     },
-    clearAll(){ ensure(); sessions = []; be.clear(); lastSave={ok:true,at:Date.now(),error:null}; return true; },
+    clearAll(){
+      ensure();
+      if(loadError) return {ok:false, error:loadError};
+      sessions = []; be.clear();
+      lastSave={ok:true,at:Date.now(),error:null};
+      return {ok:true};
+    },
 
     /* ---- 数据可靠性：让「有没有存住」这件事可见 ---- */
     /* 最近一次保存的状态，界面顶部用它显示「已存本机 N 场」或报错 */
@@ -263,25 +362,29 @@ function createStore(backend){
         error: lastSave.error,
         count: sessions.length,
         backend: be.kind ? be.kind() : 'memory',
+        loadError,
       };
     },
     /* 立刻重试写入一次（用户点「重试保存」时调用） */
     flush(){ ensure(); const ok = persist(); return {ok, error:lastSave.error}; },
-    /* 存储健康度：占用多少、上限多少、后端是否可用 */
+    /* 存储健康度：占用多少、上限多少、后端是否可用。
+       注意：这里不再主动 persist() —— health 是「看一眼」的操作，
+       每次渲染都同步重写整份 JSON 既慢又会覆盖损坏数据。 */
     health(){
       ensure();
       const bytes = serialize().length;
       const cap = 5 * 1024 * 1024;              // localStorage 通行上限约 5MB
       const available = be.available ? be.available() : true;
-      const ok = persist();                      // 主动写一次做真实校验
       const pct = Math.min(100, +(bytes/cap*100).toFixed(2));
+      const ok = !loadError && lastSave.ok !== false;
       return {
         ok, available,
         backend: be.kind ? be.kind() : 'memory',
         count: sessions.length,
         bytes, cap, pct,
-        error: lastSave.error,
-        level: (!ok || !available) ? 'bad' : (pct > 70 ? 'warn' : 'ok'),
+        error: loadError || lastSave.error,
+        loadError,
+        level: (loadError || !available || lastSave.ok === false) ? 'bad' : (pct > 70 ? 'warn' : 'ok'),
       };
     },
     /* 积累进度：用它回答「我坚持录了几天、攒了多少场」 */
@@ -290,22 +393,33 @@ function createStore(backend){
       const ordered = sessions.slice().sort((a,b)=>(a.seq||0)-(b.seq||0) || a.ts-b.ts);
       if(!ordered.length) return {n:0, days:0, first:null, last:null};
       const first = ordered[0], last = ordered[ordered.length-1];
-      const d0 = Date.parse(first.date), d1 = Date.parse(last.date);
-      const days = (isFinite(d0) && isFinite(d1))
+      // 按「日期字符串」的日历天差算，不用 Date.parse 的 UTC 语义，
+      // 否则负时区会少算一天
+      const toUTC = d => {
+        const m = String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+        return m ? Date.UTC(+m[1], +m[2]-1, +m[3]) : null;
+      };
+      const d0 = toUTC(first.date), d1 = toUTC(last.date);
+      const days = (d0 != null && d1 != null)
         ? Math.max(1, Math.round((d1-d0)/86400000) + 1) : ordered.length;
       return {n:ordered.length, days, first:first.date, last:last.date};
     },
 
     /* ---- 派生：基准线 ---- */
-    /* 排除指定场次后的历史均值（用于「本场 vs 历史」） */
-    baseline(excludeId, keys){
+    /* 排除指定场次后的历史均值（用于「本场 vs 历史」）。
+       传 upToSeq 时只统计「不晚于该场」的历史 ——
+       看历史场次时不能把未来的数据当自己的基准。 */
+    baseline(excludeId, keys, upToSeq){
       ensure();
-      const pool = excludeId ? sessions.filter(s=>s.id!==excludeId) : sessions;
+      let pool = excludeId ? sessions.filter(s=>s.id!==excludeId) : sessions;
+      if(upToSeq != null) pool = pool.filter(s=>(s.seq||0) <= upToSeq);
       if(!pool.length) return null;
       const out = {};
       (keys||['gmv','uv','stay','entry','cvr','refund','paid','score']).forEach(k=>{
+        // 只统计「有值」的场次：null/NaN 表示这场没录这项，不能按 0 参与平均
         const vals = pool.map(s=>s.snapshot[k]).filter(v=>v!=null && !isNaN(v));
         out[k] = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+        out['__n_' + k] = vals.length;
       });
       out.__n = pool.length;
       return out;
@@ -360,7 +474,7 @@ function createStore(backend){
         (a.seq||0)-(b.seq||0) || a.ts-b.ts);
       orderedSessions.forEach(s=>{
         const seen = new Set();
-        s.issues.forEach(it=>{
+        (s.issues||[]).forEach(it=>{
           const k = it.key || it.title;
           if(!k || seen.has(k)) return;
           seen.add(k);
@@ -377,7 +491,7 @@ function createStore(backend){
       Object.values(map).forEach(g=>{
         let streak = 0;
         for(let i=n-1;i>=0;i--){
-          const ks = new Set(orderedSessions[i].issues.map(x=>x.key||x.title));
+          const ks = new Set((orderedSessions[i].issues||[]).map(x=>x.key||x.title));
           if(ks.has(g.key)) streak++; else break;
         }
         g.streak = streak;
@@ -407,26 +521,51 @@ function createStore(backend){
       };
     },
 
-    /* 导出 / 导入（换设备、备份） */
-    exportJSON(){
+    /* 导出 / 导入（换设备、备份）。
+       todos 由调用方传入（行动清单存在另一个 key），一起打包 ——
+       以前只导 sessions，用户换设备后待办全丢却毫不知情。 */
+    exportJSON(todos){
       ensure();
-      return JSON.stringify({ver:STORE_VER, exported:new Date().toISOString(), sessions}, null, 2);
+      const payload = {ver:STORE_VER, exported:new Date().toISOString(), sessions};
+      if(todos != null) payload.todos = todos;
+      return JSON.stringify(payload, null, 2);
     },
     importJSON(str){
       ensure();
-      try{
-        const data = JSON.parse(str);
-        const incoming = Array.isArray(data) ? data : (data.sessions||[]);
-        let added = 0;
-        incoming.forEach(rec=>{
-          if(!rec || !rec.snapshot) return;
-          const dup = sessions.find(s=>s.fp===rec.fp && s.date===rec.date);
-          if(dup) return;
-          sessions.push(rec); added++;
-        });
-        persist();
-        return {ok:true, added, total:sessions.length};
-      }catch(e){ return {ok:false, err:e.message}; }
+      if(loadError) return {ok:false, err:loadError};
+      let data;
+      try{ data = JSON.parse(str); }
+      catch(e){ return {ok:false, err:'不是合法的 JSON：' + e.message}; }
+
+      const incoming = Array.isArray(data) ? data : (data && data.sessions);
+      if(!Array.isArray(incoming)) return {ok:false, err:'备份里没有 sessions 数组'};
+      // 版本比当前新：结构可能不认识，拒绝而不是硬塞
+      const ver = (!Array.isArray(data) && data && typeof data.ver === 'number') ? data.ver : STORE_VER;
+      if(ver > STORE_VER){
+        return {ok:false, err:'这份备份来自更新的版本（v'+ver+'），当前只支持 v'+STORE_VER+'，请升级后再导入'};
+      }
+
+      let added = 0, skipped = 0, dup = 0;
+      const maxSeq = sessions.reduce((m,s)=>Math.max(m, s.seq||0), 0);
+      let nextSeq = maxSeq;
+      incoming.forEach(raw=>{
+        const rec = coerceSession(raw, nextSeq + 1);
+        if(!rec){ skipped++; return; }
+        const hit = sessions.find(s=>s.fp===rec.fp && s.date===rec.date);
+        if(hit){ dup++; return; }
+        if(!rec.seq || rec.seq <= maxSeq) rec.seq = ++nextSeq;
+        else nextSeq = Math.max(nextSeq, rec.seq);
+        sessions.push(rec);
+        added++;
+      });
+      const ok = persist();
+      return {
+        ok:true, added, skipped, dup,
+        total: sessions.length,
+        saved: ok,
+        error: ok ? null : lastSave.error,
+        todos: (!Array.isArray(data) && data && data.todos) ? data.todos : null,
+      };
     },
 
     /* 内核数据（测试用） */
@@ -436,5 +575,5 @@ function createStore(backend){
 
 /* 导出（Node 测试环境） */
 if(typeof module !== 'undefined' && module.exports){
-  module.exports = { createStore, createMemoryBackend, createLocalBackend, snapshotOf, fingerprint, makeSession, STORE_KEY };
+  module.exports = { createStore, createMemoryBackend, createLocalBackend, snapshotOf, fingerprint, makeSession, coerceSession, STORE_KEY, STORE_VER };
 }

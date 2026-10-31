@@ -64,27 +64,38 @@
 
 - 键名：`fupantai.sessions.v3`（场次）、`fupantai.todos.v1`（行动清单）
 - 因此：**换设备、换浏览器、清站点数据都会丢** → 请定期用「导出备份」存成 JSON 文件
+- 「导出备份」会把**场次和行动清单一起**打包（v3.1 起），导入时合并恢复，不会冲掉本机已有的勾选
 - 无痕/隐私模式下浏览器会拒绝写入，页面顶部会出现红色警示（此时先导出再继续录入）
+- 如果本机存的数据损坏到解析不了，页面会进入**只读模式**并提醒你导出原始数据 ——
+  它不会用空数据覆盖掉那份可能还能抢救的原文
 
 ## 项目结构
 
 ```
 index.html    单页应用本体（视图、交互、样式全部内联）
-engine.js     分析引擎：品类基准表、诊断规则、决策裁决、待办派生
-store.js      持久化仓库：localStorage 后端、写入回读校验、导入导出
+engine.js     分析引擎：品类基准表、诊断规则、决策裁决、待办派生（纯函数，可 require）
+store.js      持久化仓库：localStorage 后端、写入回读校验、导入校验、导入导出
 test-*.js     测试套件（14 套，见下）
+.github/      CI（GitHub Actions：Node 18/20/22 × Linux/Windows）
 ```
 
-三个文件、零依赖、零构建、无 CDN。
+三个运行文件、零依赖、零构建、无 CDN。
 
 ## 测试
 
 全部零依赖，直接 `node` 跑，退出码 0/1：
 
 ```bash
+npm test              # 一次跑完全部纯 Node 测试（不需要浏览器）
+npm run test:core     # 只跑核心：engine / store / decide
+```
+
+或者单独跑：
+
+```bash
 # 桩环境（不需要浏览器）
 node test-engine.js    # 分析引擎规则
-node test-store.js     # 持久化仓库
+node test-store.js     # 持久化仓库（含损坏保护 / null 快照 / 导入校验）
 node test-multi.js     # 多场次集成
 node test-render.js    # 渲染冒烟
 node test-tabs.js      # 维度板块
@@ -101,9 +112,15 @@ node test-browser.js   # 完整用户路径
 node test-online.js    # 发布后验证线上版本（可选，需先部署）
 ```
 
-真机测试的 Chrome 路径写在脚本顶部的 `CHROME` 常量里，非 Windows 或装在别处请自行修改。
+真机测试的 Chrome 路径默认是 Windows 的安装位置，可以用环境变量覆盖：
 
-`test-online.js` 默认指向作者部署的线上地址，请用 `node test-online.js <你的地址>` 或改顶部常量。
+```bash
+CHROME_BIN=/usr/bin/google-chrome node test-lib.js        # Linux / macOS
+set CHROME_BIN=D:\Chrome\chrome.exe && node test-lib.js   # Windows 自定义路径
+```
+
+`test-online.js` 默认指向 <https://bella-rab.github.io/live-review-desk/>，
+也可以 `node test-online.js <你的地址>` 或设 `SITE_URL` 环境变量。
 
 ## 技术说明
 
@@ -112,6 +129,10 @@ node test-online.js    # 发布后验证线上版本（可选，需先部署）
   会让 Canvas 图表画不出来
 - **持久化必须校验**：`createLocalBackend` 会「探测 → 写入 → 回读」三步走，回读不一致就判定失败，
   避免隐私模式/配额满时 UI 显示「已保存」而数据其实没落盘
+- **缺失 ≠ 0**：快照里读不到的指标存 `null`，不进均值计算。
+  否则一场只填了 GMV 的记录会把「平均停留」的基线摊薄一半，下游判出根本不存在的断点
+- **读不出来 ≠ 没有数据**：localStorage 里的 JSON 解析失败时进入只读模式，一个字都不覆盖
+- **导入一律当不可信输入**：逐条补 id / seq / 指纹 / 数组字段，版本比自己新就拒绝
 - **导航历史栈 + hash 路由**：支持顶栏返回键、浏览器后退、刷新后停在原页；窄屏下侧栏隐藏时
   由顶栏换页菜单兜底
 
@@ -121,6 +142,16 @@ node test-online.js    # 发布后验证线上版本（可选，需先部署）
 （服饰 / 食品 / 美妆 / 家居 / 日用 / 通用），换成你自己行业的基准即可。
 
 注意保留「通用」这一项，未知品类会回落到它。
+
+> ⚠️ 这些基准目前是经验值，没有公开的样本来源与统计口径。
+> 拿它做投放决策前，建议先用你自己 10 场以上的真实数据替换，并在团队内对齐口径。
+
+## 已知限制
+
+- 单机工具，无后端、无账号、无多端同步
+- 解析器面向「从后台框选粘贴」的表格文本，不处理合并单元格、多级表头
+- 时段分析需要 ≥4 条分时段记录；商品四象限需要商品同时有点击/转化/销售额
+- 打印样式只覆盖诊断与报告类页面，交互控件（按钮、页签）不打印
 
 ## License
 

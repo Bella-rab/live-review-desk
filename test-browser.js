@@ -13,11 +13,13 @@
    2. 不要加 --virtual-time-budget：它和页面里的动画帧冲突，同样会把进程挂死。
 */
 const { spawn } = require('child_process');
+const { pathToFileURL } = require('url');
 const fs = require('fs');
 const path = require('path');
 
 const DIR = __dirname + '/';
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+// 允许用环境变量覆盖，否则非 Windows 机器 / 非默认安装路径永远跑不了
+const CHROME = process.env.CHROME_BIN || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const PROBE = DIR + '_probe.html';
 const PROFILE = DIR + '_cprofile';
 
@@ -45,9 +47,24 @@ const PROBE_SCRIPT = `
       (extra !== undefined ? ('  →  ' + String(extra).slice(0,150)) : ''));
   }
   function txt(){ return document.getElementById('scroll').innerHTML; }
-  function plain(s){ return String(s).replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/\\s+/g,' ').trim(); }
+  // 注意转义层数：这段代码要经过「JS 模板字符串求值」→「写进 HTML」→
+  // 「浏览器解析 <script>」三层。正则里的 \s 每过一层都可能被吃掉一个反斜杠，
+  // 退化成正则 /s+/（只匹配字母 s），断言看起来正常但在比较错的字符串。
+  // 用 RegExp 构造器 + String.fromCharCode 彻底避开反斜杠。
+  var WS = new RegExp(String.fromCharCode(92) + 's+', 'g');
+  function plain(s){
+    return String(s).split(/<[^>]*>/).join(' ')
+      .split('&nbsp;').join(' ')
+      .replace(WS, ' ')
+      .trim();
+  }
   function set(id, v){ var e = document.getElementById(id); if(e) e.value = v; }
-  function paste(rows){ return rows.map(function(r){ return r[0] + '\\t' + r[1]; }).join('\\n'); }
+  // 用 String.fromCharCode 构造分隔符，彻底绕开「模板字符串里 \\t / \t 的层数」问题。
+  // 这段探针要先被 JS 模板字符串求值一次、再作为 HTML 里的脚本被解析一次，
+  // 中间任何一层转义写错一个反斜杠，粘贴出来的就是字面量 "\t" 而不是制表符，
+  // 解析器认不出列，整场数据静默丢失。
+  var TAB = String.fromCharCode(9), LF = String.fromCharCode(10);
+  function paste(rows){ return rows.map(function(r){ return r[0] + TAB + r[1]; }).join(LF); }
   function input(text, host, date){
     go('import');
     ST.text = text;
@@ -84,7 +101,8 @@ const PROBE_SCRIPT = `
     T('落盘含解析后的指标快照',
       !!(got.sessions && got.sessions[0].snapshot && got.sessions[0].snapshot.gmv),
       got.sessions && got.sessions[0].snapshot ? got.sessions[0].snapshot.gmv : 'null');
-    T('保存回执说明「已记录为第 N 场」', /已记录为第 \\d+ 场/.test(plain(saveNoteBar())),
+    // plain() 会把「已存档」标签和正文连成一行，所以正则不锚定开头
+    T('保存回执说明「已记录为第 N 场」', /已记录为第 [0-9]+ 场/.test(plain(saveNoteBar())),
       plain(saveNoteBar()).slice(0,90));
 
     /* ===== 3. 连续跨天录入 ===== */
@@ -102,7 +120,7 @@ const PROBE_SCRIPT = `
     input(D1, '小雨', '2026-09-14');
     T('同一份数据重复导入不新增场次', STORE.all().length === 4, STORE.all().length);
     var dupNote = plain(saveNoteBar());
-    T('重复导入回执点明「第 N 场」', /第 \\d+ 场/.test(dupNote), dupNote.slice(0,120));
+    T('重复导入回执点明「第 N 场」', /第 [0-9]+ 场/.test(dupNote), dupNote.slice(0,120));
     T('重复导入回执说清「已切到那一场」', dupNote.indexOf('已切到那一场') >= 0, dupNote.slice(0,120));
     T('重复导入回执不误导（不出现「目前只有」）', dupNote.indexOf('目前只有') < 0, dupNote.slice(0,120));
 
@@ -253,6 +271,86 @@ const PROBE_SCRIPT = `
       !!document.getElementById('viewMenu') && document.getElementById('viewMenu').style.display === 'none',
       document.getElementById('viewMenu') && document.getElementById('viewMenu').style.display);
 
+    /* ===== 13. 注入防护：导入的数据可能带 HTML/脚本 =====
+       直播后台的商品名、渠道名都是自由文本，粘进来就进 innerHTML。
+       这条路径在 DOM 桩里测不出「浏览器是否真的执行了脚本」，必须真机跑。 */
+    var EVIL = '<img src=x onerror="window.__XSS_IMG=1">';
+    // 同时给汇总指标和分时段明细：overview 板块需要汇总指标才能渲染，
+    // 而拐点规则（会带上商品名）需要分时段明细。缺任一都不足以覆盖注入面。
+    var evilText = [
+      '观看人数' + TAB + '9600',
+      '平均停留时长' + TAB + '41秒',
+      'GMV' + TAB + '86420',
+      '曝光进入率' + TAB + '19%',
+      '成交转化率' + TAB + '6.8%',
+      '退款率' + TAB + '7%',
+      '',
+      '时间' + TAB + '在线人数' + TAB + '成交金额' + TAB + '讲解商品',
+      '19:00' + TAB + '100' + TAB + '0' + TAB + EVIL,
+      '19:10' + TAB + '900' + TAB + '900' + TAB + '正常款',
+      '19:20' + TAB + '950' + TAB + '950' + TAB + '正常款',
+      '19:30' + TAB + '200' + TAB + '50' + TAB + '正常款',
+      '19:40' + TAB + '950' + TAB + '950' + TAB + '正常款',
+    ].join(LF);
+    input(evilText, '安全测试', '2026-09-20');
+    T('含 HTML 的商品名能正常存档', STORE.all().length > 0, STORE.all().length);
+    T('含 HTML 的分时段表被解析出明细', !!(ST.M && ST.M.timeline.length > 0),
+      ST.M && ST.M.timeline.length);
+    ST.tab.report = 'issues';
+    go('report');
+    var evilHTML = txt();
+    T('诊断页渲染成功', evilHTML.length > 100, evilHTML.length);
+    T('注入的标签没有被渲染成真实元素',
+      document.querySelectorAll('#scroll img').length === 0,
+      document.querySelectorAll('#scroll img').length);
+    T('注入的脚本没有执行', !window.__XSS_IMG, window.__XSS_IMG);
+    // 恶意串可能出现在问题标题里（在线骤降会带上当时讲解的商品名），
+    // 也可能因为本场没触发对应规则而不出现在这一页。
+    // 所以检查的是「只要出现了，就一定是转义过的形态」：
+    // 不出现裸 <img 就合格；出现 <img 则必须是被编码过的。
+    var hasRawImg = evilHTML.indexOf('<img') >= 0;
+    T('页面里没有未转义的 <img 标签', !hasRawImg, evilHTML.indexOf('<img'));
+
+    // 换个能保证触发的视图：直接检查 esc() 与四象限标签的转义
+    T('esc() 对尖括号生效', esc(EVIL).indexOf('&lt;img') >= 0, esc(EVIL).slice(0, 40));
+    // 用 fromCharCode 构造引号，避免三层转义把 \' 吃掉
+    var Q = String.fromCharCode(34), SQ = String.fromCharCode(39);
+    T('esc() 对双引号生效', esc('a' + Q + 'b').indexOf('&quot;') >= 0, esc('a' + Q + 'b'));
+    T('esc() 对单引号生效', esc('a' + SQ + 'b').indexOf('&#39;') >= 0, esc('a' + SQ + 'b'));
+
+    // 渠道名注入：需要能拿到流量页，先在 M 里补上 sources
+    ST.M.sources = [
+      { name: EVIL, views: 100, rate: 10 },
+      { name: '自然推荐', views: 500, rate: 20 },
+      { name: '搜索', views: 400, rate: 22 },
+    ];
+    ST.M.flags.hasSources = true;
+    ST.DIAG = runDiagnosis(ST.M);
+    ST.tab.report = 'traffic';
+    go('report');
+    var trafficHTML = txt();
+    T('流量页渲染成功', trafficHTML.length > 100, trafficHTML.length);
+    T('渠道名注入没有产生真实元素',
+      document.querySelectorAll('#scroll img').length === 0,
+      document.querySelectorAll('#scroll img').length);
+    T('渠道名注入没有执行脚本', !window.__XSS_IMG, window.__XSS_IMG);
+
+    // 场次库：外部 id 不能被拼进内联 onclick
+    go('library');
+    var libHTML = txt();
+    T('场次库用 data-act 派发事件（不拼 id 进 onclick）',
+      libHTML.indexOf('data-act=') >= 0, libHTML.indexOf('data-act='));
+    var inlineHit = libHTML.indexOf('onclick=' + Q + 'loadSession(') >= 0
+      || libHTML.indexOf('onclick=' + Q + 'delSession(') >= 0
+      || libHTML.indexOf('onclick=' + Q + 'editSession(') >= 0;
+    T('场次库里没有内联 onclick 拼 id', !inlineHit, inlineHit);
+
+    /* ===== 14. 空数据不给分 ===== */
+    var emptyM = normalize([], { category: '服饰' });
+    var emptyD = runDiagnosis(emptyM);
+    T('空数据 score 为 null（不伪装成 96 分）', emptyD.score === null, emptyD.score);
+    T('空数据标记 empty', emptyD.empty === true, emptyD.empty);
+
     log.push('');
     log.push('小结：' + (FAILS === 0 ? '全部通过' : (FAILS + ' 项失败')));
   }catch(e){
@@ -348,8 +446,16 @@ function runChrome(timeoutMs, opts) {
     '--headless', '--disable-gpu', '--no-sandbox', '--no-first-run',
     '--no-default-browser-check', '--disable-extensions', '--disable-dev-shm-usage',
     '--mute-audio', '--allow-file-access-from-files',
-    '--user-data-dir=' + profile,
-    '--dump-dom', 'file:///' + probePath,
+    // 新版 Chrome 会去连更新服务，连不上时可能直接退出（输出 0 字节）。
+    // 无头批处理场景必须把这些全部关掉。
+    '--disable-component-update', '--disable-background-networking',
+    '--disable-sync', '--disable-features=Translate,BackForwardCache',
+    '--no-service-autorun', '--disable-client-side-phishing-detection',
+    '--user-data-dir=' + path.resolve(profile),
+    // 必须用 pathToFileURL：Windows 下 'file:///' + 'C:\a\b.html' 会拼出
+    // 带反斜杠的非法 URL，Chrome 直接 ERR_FILE_NOT_FOUND 或加载空白，
+    // 表现为「浏览器没返回探针结果」。
+    '--dump-dom', pathToFileURL(probePath).href,
   ];
   if (opts.size) args.splice(1, 0, '--window-size=' + opts.size);
   return new Promise(resolve => {

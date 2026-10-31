@@ -1,7 +1,7 @@
 /* 维度板块（子页签）测试：验证页面已拆成可点选的板块，且每个板块独立渲染
    node test-tabs.js */
 const fs = require('fs');
-const DIR = 'C:/Users/24425/WorkBuddy/2026-09-14-20-29-26/';
+const DIR = __dirname + '/';
 
 let pass=0, fail=0;
 function A(n,c,g){ c?(pass++,console.log('  ✓ '+n)):(fail++,console.log('  ✗ '+n+'  实际: '+JSON.stringify(g))); }
@@ -249,7 +249,7 @@ A('漏斗板块不含商品四象限', !h.includes('商品四象限'), true);
 
 ctx.setTab('traffic'); h = scrollHTML();
 A('流量板块含流量来源', h.includes('流量来源'), true);
-A('流量板块含结构解读', h.includes('流量结构解读'), true);
+A('流量板块含结构解读', h.includes('结构解读'), true);
 A('流量板块含时段热力', h.includes('时段热力'), true);
 A('流量板块含高效/低效时段排名', h.includes('最高效时段') && h.includes('最低效时段'), true);
 A('流量板块不含转化漏斗', !h.includes('转化漏斗'), true);

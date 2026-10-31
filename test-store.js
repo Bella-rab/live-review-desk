@@ -1,12 +1,15 @@
 /* 场次仓库回归测试 —— node test-store.js */
 const path = require('path');
 const fs = require('fs');
-const DIR = 'C:/Users/24425/WorkBuddy/2026-09-14-20-29-26/';
+const DIR = __dirname + '/';
 
-// 引擎提供 normalize/runDiagnosis；store 提供仓库
-eval(fs.readFileSync(DIR+'engine.js','utf8'));
-const S = require(DIR+'store.js');
-const { createStore, createMemoryBackend, snapshotOf, fingerprint } = S;
+// 引擎提供 normalize/runDiagnosis；store 提供仓库。
+// 用静态字面量 require，而不是 eval 源码或拼接路径的 require：
+// - eval 既慢又让静态检查与 IDE 失效，语法出错时还给不出行号
+// - 拼接字符串的动态 require 会被安全扫描当作任意模块加载入口
+// Node 会按本文件所在目录解析 './engine.js'，跨平台都成立。
+const { normalize, runDiagnosis } = require('./engine.js');
+const { createStore, createMemoryBackend, snapshotOf, fingerprint } = require('./store.js');
 
 let pass=0, fail=0;
 function A(n,c,g){ c?(pass++,console.log('  ✓ '+n)):(fail++,console.log('  ✗ '+n+'  实际: '+JSON.stringify(g))); }
@@ -144,19 +147,74 @@ A('空库 byHost 返回空数组', Array.isArray(empty.byHost()) && empty.byHost
 A('空库 series 不崩', empty.series().labels.length===0, empty.series().labels.length);
 A('空库 issueTrends 不崩', empty.issueTrends().length===0, empty.issueTrends().length);
 A('get 不存在的 id 返回 null', empty.get('nope')===null, empty.get('nope'));
-A('update 不存在的 id 返回 false', empty.update('nope',{note:'x'})===false, true);
-A('remove 不存在的 id 返回 false', empty.remove('nope')===false, true);
+// update/remove 现在返回 {ok, error}：持久化失败要能被调用方看到（以前恒返回 true）
+A('update 不存在的 id 返回 ok:false', empty.update('nope',{note:'x'}).ok===false, empty.update('nope',{note:'x'}));
+A('remove 不存在的 id 返回 ok:false', empty.remove('nope').ok===false, empty.remove('nope'));
 // 破损数据
 const brokenBe = createMemoryBackend();
 brokenBe.save('{不是合法json');
 const broken = createStore(brokenBe);
 A('破损数据不崩，降级为空', broken.count()===0, broken.count());
+A('破损数据置 loadError', !!broken.saveState().loadError, broken.saveState().loadError);
+// 只读保护：损坏之后任何写操作都不能覆盖原文
+const scBroken = makeScene({gmv:1000});
+broken.add({M:scBroken.M, DIAG:scBroken.DIAG, raw:'x', date:'2026-09-30'});
+A('损坏时拒绝写入，原文保住', brokenBe.load()==='{不是合法json', brokenBe.load());
+
+hr('12b. 缺失指标必须是 null，不能是 0');
+// 这些 0 会进入 baseline 求均值，把「这场没填」稀释成「这场很烂」
+const partial = createStore(createMemoryBackend());
+const onlyGmv = normalize([{views:9000, gmv:80000}], {category:'服饰'});
+const pr = partial.add({M:onlyGmv, DIAG:runDiagnosis(onlyGmv), raw:'p', hostName:'h', date:'2026-10-01'});
+A('缺 stay 时快照为 null', pr.record.snapshot.stay === null, pr.record.snapshot.stay);
+A('缺 cvr 时快照为 null', pr.record.snapshot.cvr === null, pr.record.snapshot.cvr);
+A('缺 entry 时快照为 null', pr.record.snapshot.entry === null, pr.record.snapshot.entry);
+const fullM = normalize([{views:10000, avgStay:60, gmv:100000, entryRate:20, cvr:9, refundRate:6}], {category:'服饰'});
+partial.add({M:fullM, DIAG:runDiagnosis(fullM), raw:'f', hostName:'h', date:'2026-10-02'});
+const bl = partial.baseline(pr.record.id);
+A('基线只统计有值的场次（stay=60 而非 0）', bl.stay === 60, bl.stay);
+A('基线只统计有值的场次（cvr=9 而非 0）', bl.cvr === 9, bl.cvr);
+
+hr('12c. 冷启动状态：ok=null 不能当成失败');
+const savedJson = JSON.stringify({ver:3, sessions:[
+  {id:'a', date:'2026-01-01', hostName:'h', snapshot:{gmv:1}, issues:[], timeline:[], products:[], sources:[], seq:1, ts:1},
+]});
+const coldBe = createMemoryBackend(); coldBe.save(savedJson);
+const cold = createStore(coldBe);
+A('冷启动 saveState.ok === null', cold.saveState().ok === null, cold.saveState().ok);
+A('冷启动读得到数据', cold.count()===1, cold.count());
+A('冷启动 health 不为 bad', cold.health().level !== 'bad', cold.health().level);
+
+hr('12d. 导入校验');
+const target2 = createStore(createMemoryBackend());
+const bad1 = target2.importJSON(JSON.stringify({ver:3, sessions:[
+  {date:'2026-02-01', hostName:'x', snapshot:{gmv:1}},
+]}));
+A('缺字段的记录被补全后导入', bad1.ok && bad1.added===1, bad1);
+A('补全后 issueTrends 不崩', Array.isArray(target2.issueTrends()), typeof target2.issueTrends());
+A('补全后记录有 id', !!target2.all()[0].id, target2.all()[0].id);
+A('补全后记录有 seq', target2.all()[0].seq > 0, target2.all()[0].seq);
+const tooNew = target2.importJSON(JSON.stringify({ver:99, sessions:[]}));
+A('未来版本备份被拒绝', tooNew.ok===false, tooNew);
+A('非 sessions 结构被拒绝', target2.importJSON('{"foo":1}').ok===false, target2.importJSON('{"foo":1}'));
+const target3 = createStore(createMemoryBackend());
+const noFp = target3.importJSON(JSON.stringify({ver:3, sessions:[
+  {date:'2026-03-01', snapshot:{gmv:2}},
+  {date:'2026-03-01', snapshot:{gmv:3}},
+]}));
+A('无指纹的两条不同记录都能导入', noFp.added===2, noFp);
+
+hr('12e. 备份包含待办');
+const dumpWith = JSON.parse(store.exportJSON({done:{'a|b':1}, manual:{}}));
+A('传了 todos 就写进备份', !!dumpWith.todos, Object.keys(dumpWith));
+const dumpWithout = JSON.parse(store.exportJSON());
+A('不传 todos 时字段省略', Object.keys(dumpWithout).indexOf('todos')<0, Object.keys(dumpWithout));
 
 hr('13. 更新场次元信息');
 const id0 = store.all()[0].id;
-A('更新备注成功', store.update(id0, {note:'这场试验了新开场'})===true, true);
+A('更新备注成功', store.update(id0, {note:'这场试验了新开场'}).ok===true, true);
 A('备注已写入', store.get(id0).note==='这场试验了新开场', store.get(id0).note);
-A('更新主播名', store.update(id0,{hostName:'小满'})===true, true);
+A('更新主播名', store.update(id0,{hostName:'小满'}).ok===true, true);
 A('主播名已改', store.get(id0).hostName==='小满', store.get(id0).hostName);
 
 console.log('\n'+'='.repeat(58));

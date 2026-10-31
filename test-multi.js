@@ -1,9 +1,10 @@
 /* 多场次集成测试：模拟真实使用流程 —— node test-multi.js */
 const fs = require('fs');
-const DIR = 'C:/Users/24425/WorkBuddy/2026-09-14-20-29-26/';
+const DIR = __dirname + '/';
 
-eval(fs.readFileSync(DIR+'engine.js','utf8'));
-const { createStore, createMemoryBackend } = require(DIR+'store.js');
+// 用静态字面量 require，而不是 eval 源码 / 拼路径的动态 require。
+const { normalize, parseTable, parseDelimited, runDiagnosis } = require('./engine.js');
+const { createStore, createMemoryBackend } = require('./store.js');
 
 let pass=0, fail=0;
 function A(n,c,g){ c?(pass++,console.log('  ✓ '+n)):(fail++,console.log('  ✗ '+n+'  实际: '+JSON.stringify(g))); }

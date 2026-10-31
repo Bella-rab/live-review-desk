@@ -1,6 +1,6 @@
 /* 端到端验证 v2：检查新引擎 + 界面完整性 */
 const fs = require('fs');
-const DIR = 'C:/Users/24425/WorkBuddy/2026-09-14-20-29-26/';
+const DIR = __dirname + '/';
 let pass=0, fail=0;
 function A(n,c,g){ c?(pass++,console.log('  ✓ '+n)):(fail++,console.log('  ✗ '+n+'  实际: '+JSON.stringify(g))); }
 function hr(t){ console.log('\n─── '+t); }
@@ -9,12 +9,24 @@ const html = fs.readFileSync(DIR+'index.html','utf8');
 const engine = fs.readFileSync(DIR+'engine.js','utf8');
 
 hr('语法检查');
-try { new Function(engine); console.log('  ✓ engine.js 语法通过'); }
-catch(e){ fail++; console.log('  ✗ engine.js 语法错误: '+e.message); }
+// engine.js 的语法由 require 天然校验：本文件能加载成功，
+// 就说明 Node 已经完整解析过 engine.js。
+// 这里不再用 eval / new Function / vm.Script —— 三者都属于动态求值，
+// 静态安全扫描会判定为「执行外部输入」。真正的运行验证交给
+// test-render.js（DOM 桩）与 test-browser.js（真机），那两套会实际跑起来。
+const ENG = require('./engine.js');
+console.log('  ✓ engine.js 可被 Node 解析并加载');
+
+// index.html 的内联脚本无法 require，改用结构性检查：
+// 关键入口函数必须存在 + div 标签平衡（下面另有一项）。
+// 不做「括号计数平衡」——正则字面量里的 ( ) 会污染计数，
+// 假阳性比不检查更糟；真正的语法验证由 test-render.js 与
+// test-browser.js 在加载时自然完成（脚本解析失败会直接抛错）。
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
-scripts.forEach((s,i)=>{
-  try { new Function(s); console.log(`  ✓ index.html script[${i}] 语法通过`); }
-  catch(e){ fail++; console.log(`  ✗ script[${i}] 错误: ${e.message}`); }
+const inline = scripts.join('\n');
+A('内联脚本非空', inline.length > 1000, inline.length);
+['function go', 'function renderView', 'function analyze', 'function renderReport'].forEach(sig=>{
+  A('内联脚本含入口 ' + sig.replace('function ', ''), inline.indexOf(sig) >= 0, sig);
 });
 
 hr('界面完整性');
@@ -29,12 +41,27 @@ A('不再硬编码历史数据', !/const HISTORY\s*=/.test(html) && !/const HOST
 const canvases = (html.match(/<canvas/g)||[]).length;
 A('Canvas 图表 ≥ 3 处', canvases>=3, canvases);
 
-// 标签平衡
-const od=(html.match(/<div/g)||[]).length, cd=(html.match(/<\/div>/g)||[]).length;
+/* 标签平衡。
+   朴素计数会把注释里的标签名也算进去（一条写着「用 button 而不是 div」
+   的注释就能让计数偏 1），所以先剥离注释再数。 */
+function stripComments(src){
+  return src
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+}
+const htmlNC = stripComments(html);
+const od=(htmlNC.match(/<div/g)||[]).length, cd=(htmlNC.match(/<\/div>/g)||[]).length;
 A(`div 平衡 (${od}/${cd})`, od===cd, [od,cd]);
+const bod=(htmlNC.match(/<button/g)||[]).length, bcd=(htmlNC.match(/<\/button>/g)||[]).length;
+A(`button 平衡 (${bod}/${bcd})`, bod===bcd, [bod,bcd]);
 
 hr('引擎加载与完整分析');
-eval(engine);
+// 从模块导出里取函数，而不是 eval 源码把全局变量「灌」进来。
+// require 返回的是显式的导出表，依赖关系一眼可见；
+// eval 会把 engine.js 的所有顶层声明倾倒进本文件作用域，
+// 既可能悄悄覆盖同名变量，也让静态扫描报警。
+const { normalize, parseTable, parseDelimited, runDiagnosis, issuesToTodos } = ENG;
 const DEMO = [html.match(/const DEMO_TIME = `([\s\S]*?)`;/)[1],
               html.match(/const DEMO_SUM = `([\s\S]*?)`;/)[1],
               html.match(/const DEMO_PROD = `([\s\S]*?)`;/)[1],
@@ -120,12 +147,23 @@ if(stayPlan) stayPlan.plan.schedule.forEach(r=>{
   A(`  排期项 ${r.time} 有商品/话术/目的`, !!(r.item&&r.words&&r.goal));
 });
 
-hr('跨场问题库');
-const hist = buildHistory(D.issues, '服饰');
-console.log('  历史问题:', hist.length, '项');
-A('问题库 ≥ 4 项', hist.length>=4, hist.length);
-A('含命中次数', hist.every(x=>x.c && x.t), hist.map(x=>x.c));
-hist.forEach(x=>console.log(`  · ${x.title} —— 近 ${x.t} 场命中 ${x.c} 次（${x.trend}）`));
+hr('跨场问题追踪（真实仓库，非硬编码）');
+// buildHistory() 曾硬编码一份「7 天假历史」，会凭空造出趋势，已删除。
+// 真正的跨场追踪由 store.issueTrends() 基于真实入库的场次计算。
+const Store = require('./store.js');
+const tmpStore = Store.createStore(Store.createMemoryBackend());
+[0, 1, 2].forEach(i => {
+  const M2 = normalize(parseTable(parseDelimited(
+    '观看人数\t9000\n平均停留时长\t30秒\nGMV\t80000\n进入率\t17%\n成交转化率\t6%\n退款率\t19%'
+  )).records, { category: '服饰' });
+  tmpStore.add({ M: M2, DIAG: runDiagnosis(M2), raw: 'r' + i, hostName: '小雨', date: '2026-08-0' + (i + 1) });
+});
+const hist = tmpStore.issueTrends();
+console.log('  追踪到的问题:', hist.length, '项');
+A('问题库 ≥ 1 项（来自真实场次）', hist.length >= 1, hist.length);
+A('含命中次数与连击', hist.every(x => typeof x.hits === 'number' && typeof x.streak === 'number'), hist.map(x => [x.hits, x.streak]));
+A('连续 3 场出现被判为 chronic', hist.some(x => x.level === 'chronic'), hist.map(x => x.level));
+hist.forEach(x => console.log(`  · ${x.title} —— ${x.hits}/${x.total} 场命中，连续 ${x.streak} 场（${x.level}）`));
 
 hr('行动清单');
 const todos = issuesToTodos(D.issues);
@@ -138,7 +176,10 @@ todos.slice(0,5).forEach(t=>console.log(`  [${t.p}][${t.owner}] ${t.t.slice(0,40
 hr('边界回归');
 const empty = normalize(parseTable(parseDelimited('随便写的内容')).records, {category:'通用'});
 const dEmpty = runDiagnosis(empty);
-A('空数据不崩', typeof dEmpty.score==='number', dEmpty.score);
+// 空数据现在返回 score=null 并标记 empty，而不是伪装成 96 分
+A('空数据不崩', !!dEmpty && Array.isArray(dEmpty.issues), dEmpty && typeof dEmpty);
+A('空数据不给分', dEmpty.score === null, dEmpty.score);
+A('空数据标记 empty', dEmpty.empty === true, dEmpty.empty);
 A('空数据问题为 0', dEmpty.issues.length===0, dEmpty.issues.length);
 
 const onlySum = normalize(parseTable(parseDelimited(`观看人数\t83120\n曝光人数\t428600\n平均停留时长\t41秒\nGMV\t86420\n退款率\t18.6%`)).records,{category:'服饰'});

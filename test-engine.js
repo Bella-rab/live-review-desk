@@ -4,8 +4,10 @@
 */
 const fs = require('fs');
 const path = require('path');
-const src = fs.readFileSync(path.join(__dirname, 'engine.js'), 'utf8');
-eval(src);
+// 用模块导出而不是 eval 源码：显式依赖清单 + 语法错误带行号 +
+// 静态检查可用。eval 会把整份源码当字符串执行，任何一处语法错
+// 都只能得到一句没有上下文的报错。
+const { normalize, parseTable, parseDelimited, runDiagnosis } = require('./engine.js');
 
 let pass = 0, fail = 0;
 function hr(t){ console.log('\n' + '─'.repeat(60) + '\n' + t); }
@@ -124,7 +126,11 @@ try {
   assert('乱码记录为 0', a.timeline.length === 0 && Object.keys(a.session).length === 0);
   const b = norm('');
   const d = runDiagnosis(b);
-  assert('空数据不崩', typeof d.score === 'number');
+  // 空数据不给分（score = null），而不是伪装成 96 分的「健康场次」。
+  // 以前这里断言 typeof === 'number'，等于把「没读到数据也算健康」当成正确行为。
+  assert('空数据不崩', d && Array.isArray(d.issues), d && typeof d);
+  assert('空数据不给分', d.score === null, d.score);
+  assert('空数据标记 empty', d.empty === true, d.empty);
 } catch(e){ crashed = true; console.log('  ✗ 抛出异常:', e.message); }
 
 hr('11 · 商品明细识别');
@@ -151,6 +157,39 @@ const r13 = norm(`观看人数\t平均停留\tGMV
 针织开衫\t2.1%\t7080`);
 assert('汇总 views 正确', r13.session.views === 83120, r13.session.views);
 assert('汇总 gmv 未被商品行覆盖', r13.session.gmv === 86420, r13.session.gmv);
+
+hr('14 · 竖排脏数据必须被拦（别只拦横排）');
+// 竖排是后台导出最常见的格式。这一条防的是「只给横排加校验、
+// 竖排漏掉」——那样负观看人数、400% 转化率会一路进规则引擎。
+{
+  const txt = [
+    '观看人数\t9600',
+    '平均停留时长\t41秒',
+    'GMV\t86420',
+    '曝光进入率\t250%',
+    '成交转化率\t6.8%',
+    '退款率\t-5%',
+    '付费流量占比\t34%',
+  ].join('\n');
+  const p = parseTable(parseDelimited(txt));
+  assert('竖排模式识别', p.mode === 'vertical', p.mode);
+  assert('正常的 9600 被保留', p.records[0].views === 9600, p.records[0].views);
+  assert('250% 的进入率被丢弃', p.records[0].entryRate === undefined, p.records[0].entryRate);
+  assert('-5% 的退款率被丢弃', p.records[0].refundRate === undefined, p.records[0].refundRate);
+  assert('被丢弃的值有记录', Array.isArray(p.clamped) && p.clamped.length === 2,
+    p.clamped && p.clamped.length);
+  const Md = normalize(p.records, { category: '服饰' });
+  assert('脏值没有进入 session', Md.session.entryRate === undefined, Md.session.entryRate);
+}
+
+hr('15 · 全是脏值时不给分');
+{
+  const p = parseTable(parseDelimited('观看人数\t-500\nGMV\t-100\n退款率\t999%'));
+  const Md = normalize(p.records, { category: '服饰' });
+  const Dd = runDiagnosis(Md);
+  assert('全脏数据 score 为 null', Dd.score === null, Dd.score);
+  assert('全脏数据标记 empty', Dd.empty === true, Dd.empty);
+}
 
 console.log('\n' + '='.repeat(60));
 console.log(`回归测试完成：通过 ${pass}，失败 ${fail}`);

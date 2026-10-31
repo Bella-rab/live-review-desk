@@ -4,7 +4,7 @@
    ④ 有落后项时才出现归因段，全好时不硬凑
    node test-gap.js */
 const fs = require('fs');
-const DIR = 'C:/Users/24425/WorkBuddy/2026-09-14-20-29-26/';
+const DIR = __dirname + '/';
 
 let pass = 0, fail = 0;
 function A(n, c, g) { c ? (pass++, console.log('  ✓ ' + n)) : (fail++, console.log('  ✗ ' + n + '  实际: ' + JSON.stringify(g))); }
